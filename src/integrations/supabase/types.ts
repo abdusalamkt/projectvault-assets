@@ -14,13 +14,96 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      project_images: {
+        Row: {
+          created_at: string
+          id: string
+          project_id: string
+          sort_order: number
+          storage_path: string | null
+          tags: string[]
+          url: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          project_id: string
+          sort_order?: number
+          storage_path?: string | null
+          tags?: string[]
+          url: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          project_id?: string
+          sort_order?: number
+          storage_path?: string | null
+          tags?: string[]
+          url?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_images_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      projects: {
+        Row: {
+          contractor: string | null
+          country: string | null
+          created_at: string
+          description: string | null
+          finish: string | null
+          id: string
+          product: string | null
+          project_name: string
+          project_no: string
+          sector: string | null
+          tags: string[]
+          updated_at: string
+        }
+        Insert: {
+          contractor?: string | null
+          country?: string | null
+          created_at?: string
+          description?: string | null
+          finish?: string | null
+          id?: string
+          product?: string | null
+          project_name: string
+          project_no: string
+          sector?: string | null
+          tags?: string[]
+          updated_at?: string
+        }
+        Update: {
+          contractor?: string | null
+          country?: string | null
+          created_at?: string
+          description?: string | null
+          finish?: string | null
+          id?: string
+          product?: string | null
+          project_name?: string
+          project_no?: string
+          sector?: string | null
+          tags?: string[]
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      show_limit: { Args: never; Returns: number }
+      show_trgm: { Args: { "": string }; Returns: string[] }
     }
     Enums: {
       [_ in never]: never
