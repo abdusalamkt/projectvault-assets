@@ -63,6 +63,7 @@ export type Database = {
           product: string | null
           project_name: string
           project_no: string
+          search_tsv: unknown
           sector: string | null
           tags: string[]
           updated_at: string
@@ -77,6 +78,7 @@ export type Database = {
           product?: string | null
           project_name: string
           project_no: string
+          search_tsv?: unknown
           sector?: string | null
           tags?: string[]
           updated_at?: string
@@ -91,6 +93,7 @@ export type Database = {
           product?: string | null
           project_name?: string
           project_no?: string
+          search_tsv?: unknown
           sector?: string | null
           tags?: string[]
           updated_at?: string

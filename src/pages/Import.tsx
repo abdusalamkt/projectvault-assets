@@ -27,13 +27,18 @@ const SAMPLE = `Project No,Project Name,Sector,Country,Product,Finish,Contractor
 
 export default function Import() {
   const [busy, setBusy] = useState(false);
-  const [progress, setProgress] = useState({ done: 0, total: 0, created: 0, updated: 0, errors: [] as string[] });
+  const [progress, setProgress] = useState({
+    done: 0, total: 0, created: 0, updated: 0,
+    createdRows: [] as string[],
+    updatedRows: [] as string[],
+    errors: [] as string[],
+  });
 
   const parseHeader = (h: string) => ALIASES[h.trim().toLowerCase()];
 
   const handleFile = (file: File) => {
     setBusy(true);
-    setProgress({ done: 0, total: 0, created: 0, updated: 0, errors: [] });
+    setProgress({ done: 0, total: 0, created: 0, updated: 0, createdRows: [], updatedRows: [], errors: [] });
 
     Papa.parse<Record<string, string>>(file, {
       header: true, skipEmptyLines: true,
@@ -50,6 +55,8 @@ export default function Import() {
 
         let created = 0, updated = 0;
         const errors: string[] = [];
+        const createdRows: string[] = [];
+        const updatedRows: string[] = [];
         for (let i = 0; i < rows.length; i++) {
           const r = rows[i];
           try {
@@ -65,7 +72,8 @@ export default function Import() {
             const { data, error } = await supabase
               .from("projects").upsert(payload, { onConflict: "project_no" }).select().single();
             if (error) throw error;
-            if (existing) updated++; else created++;
+            if (existing) { updated++; updatedRows.push(`${r.project_no} — ${r.project_name}`); }
+            else          { created++; createdRows.push(`${r.project_no} — ${r.project_name}`); }
 
             if (r.images) {
               const urls = r.images.split("|").map((u) => u.trim()).filter((u) => /^https?:\/\//.test(u));
@@ -75,9 +83,9 @@ export default function Import() {
               }
             }
           } catch (e: any) {
-            errors.push(`Row ${i + 1} (${r.project_no}): ${e.message}`);
+            errors.push(`Row ${i + 1} (${r.project_no || "—"}): ${e.message}`);
           }
-          setProgress((p) => ({ ...p, done: i + 1, total: rows.length, created, updated, errors }));
+          setProgress({ done: i + 1, total: rows.length, created, updated, createdRows, updatedRows, errors });
         }
 
         toast.success(`Imported: ${created} created, ${updated} updated${errors.length ? `, ${errors.length} errors` : ""}`);
@@ -135,6 +143,22 @@ export default function Import() {
               <summary className="cursor-pointer text-muted-foreground">View errors</summary>
               <ul className="mt-2 space-y-1 text-destructive">
                 {progress.errors.slice(0, 20).map((e, i) => <li key={i}>{e}</li>)}
+              </ul>
+            </details>
+          )}
+          {progress.createdRows.length > 0 && (
+            <details className="mt-3 text-xs">
+              <summary className="cursor-pointer text-muted-foreground">View created ({progress.createdRows.length})</summary>
+              <ul className="mt-2 space-y-1 max-h-48 overflow-auto">
+                {progress.createdRows.map((r, i) => <li key={i}>{r}</li>)}
+              </ul>
+            </details>
+          )}
+          {progress.updatedRows.length > 0 && (
+            <details className="mt-3 text-xs">
+              <summary className="cursor-pointer text-muted-foreground">View updated ({progress.updatedRows.length})</summary>
+              <ul className="mt-2 space-y-1 max-h-48 overflow-auto">
+                {progress.updatedRows.map((r, i) => <li key={i}>{r}</li>)}
               </ul>
             </details>
           )}
