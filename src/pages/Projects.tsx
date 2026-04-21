@@ -12,14 +12,30 @@ import { toast } from "sonner";
 
 const PAGE_SIZE = 24;
 
+type PersistedState = {
+  search: string;
+  filters: Partial<Record<FilterFieldExt, string[]>>;
+  sort: SortKey;
+  page: number;
+  scrollY: number;
+};
+const STORAGE_KEY = "atlas-dam:projects-state";
+const loadPersisted = (): Partial<PersistedState> => {
+  try {
+    const raw = sessionStorage.getItem(STORAGE_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch { return {}; }
+};
+const persisted = loadPersisted();
+
 export default function Projects() {
   const { session } = useAuth();
   const isAdmin = session?.role === "admin";
-  const [search, setSearch] = useState("");
-  const [debounced, setDebounced] = useState("");
-  const [filters, setFilters] = useState<Partial<Record<FilterFieldExt, string[]>>>({});
-  const [sort, setSort] = useState<SortKey>("created_desc");
-  const [page, setPage] = useState(0);
+  const [search, setSearch] = useState<string>(persisted.search ?? "");
+  const [debounced, setDebounced] = useState<string>(persisted.search ?? "");
+  const [filters, setFilters] = useState<Partial<Record<FilterFieldExt, string[]>>>(persisted.filters ?? {});
+  const [sort, setSort] = useState<SortKey>(persisted.sort ?? "created_desc");
+  const [page, setPage] = useState<number>(persisted.page ?? 0);
   const [rows, setRows] = useState<ProjectRow[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -32,12 +48,20 @@ export default function Projects() {
   const [zipProgress, setZipProgress] = useState<{ done: number; total: number } | null>(null);
 
   useEffect(() => {
-    const t = setTimeout(() => { setDebounced(search); setPage(0); }, 250);
+    const t = setTimeout(() => {
+      setDebounced(search);
+      if (search !== (persisted.search ?? "")) setPage(0);
+    }, 250);
     return () => clearTimeout(t);
   }, [search]);
 
-  useEffect(() => { setPage(0); }, [JSON.stringify(filters)]);
-  useEffect(() => { setPage(0); }, [sort]);
+  const filtersKey = JSON.stringify(filters);
+  useEffect(() => {
+    if (filtersKey !== JSON.stringify(persisted.filters ?? {})) setPage(0);
+  }, [filtersKey]);
+  useEffect(() => {
+    if (sort !== (persisted.sort ?? "created_desc")) setPage(0);
+  }, [sort]);
 
   useEffect(() => {
     setLoading(true);
@@ -45,6 +69,37 @@ export default function Projects() {
       .then(({ rows, total }) => { setRows(rows); setTotal(total); })
       .finally(() => setLoading(false));
   }, [debounced, JSON.stringify(filters), page, sort]);
+
+  // Persist state to sessionStorage on change
+  useEffect(() => {
+    try {
+      sessionStorage.setItem(STORAGE_KEY, JSON.stringify({
+        search, filters, sort, page, scrollY: window.scrollY,
+      }));
+    } catch {}
+  }, [search, filtersKey, sort, page]);
+
+  // Restore scroll once results are loaded
+  useEffect(() => {
+    if (!loading && persisted.scrollY) {
+      const y = persisted.scrollY;
+      requestAnimationFrame(() => window.scrollTo(0, y));
+      persisted.scrollY = 0;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading]);
+
+  // Save scroll position before unload/navigation
+  useEffect(() => {
+    const save = () => {
+      try {
+        const cur = JSON.parse(sessionStorage.getItem(STORAGE_KEY) || "{}");
+        sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ ...cur, scrollY: window.scrollY }));
+      } catch {}
+    };
+    window.addEventListener("beforeunload", save);
+    return () => { save(); window.removeEventListener("beforeunload", save); };
+  }, []);
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
