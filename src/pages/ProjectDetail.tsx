@@ -200,12 +200,13 @@ export default function ProjectDetail() {
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <button onClick={exportPdf} className="inline-flex items-center gap-2 px-3 py-2 border border-border rounded-sm text-sm hover:bg-secondary transition-smooth">
-            <FileDown size={14} /> PDF
+          <button onClick={exportPdf} disabled={pdfBusy} className="inline-flex items-center gap-2 px-3 py-2 border border-border rounded-sm text-sm hover:bg-secondary transition-smooth disabled:opacity-50">
+            {pdfBusy ? <Loader2 size={14} className="animate-spin" /> : <FileDown size={14} />} PDF
           </button>
           {images.length > 0 && (
-            <button onClick={downloadAll} className="inline-flex items-center gap-2 px-3 py-2 border border-border rounded-sm text-sm hover:bg-secondary transition-smooth">
-              <Download size={14} /> Images
+            <button onClick={downloadAll} disabled={!!zipProgress} className="inline-flex items-center gap-2 px-3 py-2 border border-border rounded-sm text-sm hover:bg-secondary transition-smooth disabled:opacity-50">
+              {zipProgress ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
+              {zipProgress ? `${zipProgress.done}/${zipProgress.total}` : (images.length > 1 ? "Images (ZIP)" : "Image")}
             </button>
           )}
           {isAdmin && (
@@ -234,6 +235,15 @@ export default function ProjectDetail() {
                   className="group relative aspect-square overflow-hidden rounded-sm bg-muted">
                   <img src={img.url} alt="" loading="lazy"
                     className="w-full h-full object-cover group-hover:scale-105 transition-smooth duration-500" />
+                  <span
+                    onClick={async (e) => {
+                      e.stopPropagation();
+                      try { await downloadSingleImage(img.url, fileNameFromUrl(img.url)); }
+                      catch (err: any) { toast.error(err.message); }
+                    }}
+                    title="Download"
+                    className="absolute top-2 left-2 p-1.5 bg-background/90 text-foreground rounded-sm opacity-0 group-hover:opacity-100 transition-smooth hover:bg-background"
+                  ><Download size={12} /></span>
                   {isAdmin && (
                     <span
                       onClick={async (e) => {
@@ -279,16 +289,38 @@ export default function ProjectDetail() {
               <p className="text-sm mt-1 text-foreground/80">{project.description}</p>
             </div>
           )}
-          {project.tags.length > 0 && (
-            <div className="mt-4 pt-4 border-t border-border">
-              <div className="text-xs uppercase tracking-widest text-muted-foreground mb-2">Tags</div>
-              <div className="flex flex-wrap gap-1.5">
-                {project.tags.map((t) => (
-                  <span key={t} className="text-xs bg-secondary px-2 py-1 rounded-sm">{t}</span>
-                ))}
-              </div>
+          <div className="mt-4 pt-4 border-t border-border">
+            <div className="text-xs uppercase tracking-widest text-muted-foreground mb-2">Tags</div>
+            <div className="flex flex-wrap gap-1.5 mb-2">
+              {project.tags.length === 0 && <span className="text-xs text-muted-foreground">No tags</span>}
+              {project.tags.map((t) => (
+                <span key={t} className="inline-flex items-center gap-1 text-xs bg-secondary px-2 py-1 rounded-sm">
+                  {t}
+                  {isAdmin && (
+                    <button onClick={() => removeTag(t)} disabled={tagBusy} className="hover:text-destructive transition-smooth">
+                      <X size={10} />
+                    </button>
+                  )}
+                </span>
+              ))}
             </div>
-          )}
+            {isAdmin && (
+              <div className="flex gap-1.5">
+                <input
+                  value={tagDraft}
+                  onChange={(e) => setTagDraft(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addTag(); } }}
+                  placeholder="Add tag…"
+                  className="flex-1 bg-background border border-border rounded-sm px-2 py-1 text-xs focus:outline-none focus:border-gold transition-smooth"
+                />
+                <button
+                  onClick={addTag}
+                  disabled={tagBusy || !tagDraft.trim()}
+                  className="px-2 py-1 bg-primary text-primary-foreground rounded-sm text-xs disabled:opacity-40 hover:bg-primary/90 transition-smooth inline-flex items-center"
+                ><Plus size={12} /></button>
+              </div>
+            )}
+          </div>
         </aside>
       </div>
 
