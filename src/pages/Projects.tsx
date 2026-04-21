@@ -12,14 +12,30 @@ import { toast } from "sonner";
 
 const PAGE_SIZE = 24;
 
+type PersistedState = {
+  search: string;
+  filters: Partial<Record<FilterFieldExt, string[]>>;
+  sort: SortKey;
+  page: number;
+  scrollY: number;
+};
+const STORAGE_KEY = "atlas-dam:projects-state";
+const loadPersisted = (): Partial<PersistedState> => {
+  try {
+    const raw = sessionStorage.getItem(STORAGE_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch { return {}; }
+};
+const persisted = loadPersisted();
+
 export default function Projects() {
   const { session } = useAuth();
   const isAdmin = session?.role === "admin";
-  const [search, setSearch] = useState("");
-  const [debounced, setDebounced] = useState("");
-  const [filters, setFilters] = useState<Partial<Record<FilterFieldExt, string[]>>>({});
-  const [sort, setSort] = useState<SortKey>("created_desc");
-  const [page, setPage] = useState(0);
+  const [search, setSearch] = useState<string>(persisted.search ?? "");
+  const [debounced, setDebounced] = useState<string>(persisted.search ?? "");
+  const [filters, setFilters] = useState<Partial<Record<FilterFieldExt, string[]>>>(persisted.filters ?? {});
+  const [sort, setSort] = useState<SortKey>(persisted.sort ?? "created_desc");
+  const [page, setPage] = useState<number>(persisted.page ?? 0);
   const [rows, setRows] = useState<ProjectRow[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
