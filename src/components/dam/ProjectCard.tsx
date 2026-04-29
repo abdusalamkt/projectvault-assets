@@ -3,7 +3,7 @@ import { ProjectRow } from "@/lib/dam";
 import { motion } from "framer-motion";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Check } from "lucide-react";
+import { Check, ExternalLink } from "lucide-react";
 
 interface Props {
   project: ProjectRow;
@@ -28,6 +28,14 @@ export default function ProjectCard({ project, index, selectable, selected, onTo
     onToggleSelect?.(project.id);
   };
 
+  // In selection mode: clicking the tile toggles selection (don't navigate).
+  const handleCardClick = (e: React.MouseEvent) => {
+    if (selectable) {
+      e.preventDefault();
+      onToggleSelect?.(project.id);
+    }
+  };
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 12 }}
@@ -36,20 +44,34 @@ export default function ProjectCard({ project, index, selectable, selected, onTo
       className="relative"
     >
       {selectable && (
-        <button
-          onClick={handleSelectClick}
-          aria-label={selected ? "Deselect" : "Select"}
-          className={`absolute top-3 left-3 z-10 w-6 h-6 rounded-sm border flex items-center justify-center transition-smooth ${
-            selected
-              ? "bg-gold border-gold text-background"
-              : "bg-background/80 backdrop-blur border-border hover:border-gold"
-          }`}
-        >
-          {selected && <Check size={14} strokeWidth={3} />}
-        </button>
+        <>
+          <button
+            onClick={handleSelectClick}
+            aria-label={selected ? "Deselect" : "Select"}
+            className={`absolute top-3 left-3 z-10 w-6 h-6 rounded-sm border flex items-center justify-center transition-smooth ${
+              selected
+                ? "bg-gold border-gold text-background"
+                : "bg-background/80 backdrop-blur border-border hover:border-gold"
+            }`}
+          >
+            {selected && <Check size={14} strokeWidth={3} />}
+          </button>
+          <a
+            href={`/projects/${project.id}`}
+            target="_blank"
+            rel="noreferrer"
+            onClick={(e) => e.stopPropagation()}
+            aria-label="Open in new tab"
+            title="Open in new tab"
+            className="absolute top-3 right-3 z-10 w-7 h-7 rounded-sm bg-background/85 backdrop-blur border border-border hover:border-gold flex items-center justify-center transition-smooth"
+          >
+            <ExternalLink size={13} />
+          </a>
+        </>
       )}
       <Link
         to={`/projects/${project.id}`}
+        onClick={handleCardClick}
         className={`group block bg-card border rounded-sm overflow-hidden shadow-soft hover:shadow-lift transition-smooth ${
           selected ? "border-gold ring-1 ring-gold/40" : "border-border"
         }`}

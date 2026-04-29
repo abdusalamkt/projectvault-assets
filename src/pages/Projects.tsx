@@ -1,19 +1,23 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { listProjects, ProjectRow, FilterFieldExt, SortKey, bulkAddTags, getImagesForProjects } from "@/lib/dam";
+import { listProjects, ProjectRow, FilterFieldExt, SortKey, bulkAddTags, getImagesForProjects, getProject } from "@/lib/dam";
 import FilterPanel from "@/components/dam/FilterPanel";
 import ProjectCard from "@/components/dam/ProjectCard";
 import SearchBar from "@/components/dam/SearchBar";
 import SortMenu from "@/components/dam/SortMenu";
 import { useAuth } from "@/context/AuthContext";
-import { Plus, Loader2, CheckSquare, Square, Tag, Download, X } from "lucide-react";
+import { Plus, Loader2, CheckSquare, Square, Tag, Download, X, FileDown } from "lucide-react";
 import { downloadAsZip, fileNameFromUrl } from "@/lib/download";
+import { buildCombinedPdf } from "@/lib/pdf";
 import { toast } from "sonner";
 
 const PAGE_SIZE = 24;
 
+interface Chip { label: string; type: string; value: string }
+
 type PersistedState = {
   search: string;
+  chips: Chip[];
   filters: Partial<Record<FilterFieldExt, string[]>>;
   sort: SortKey;
   page: number;
@@ -33,6 +37,7 @@ export default function Projects() {
   const isAdmin = session?.role === "admin";
   const [search, setSearch] = useState<string>(persisted.search ?? "");
   const [debounced, setDebounced] = useState<string>(persisted.search ?? "");
+  const [chips, setChips] = useState<Chip[]>(persisted.chips ?? []);
   const [filters, setFilters] = useState<Partial<Record<FilterFieldExt, string[]>>>(persisted.filters ?? {});
   const [sort, setSort] = useState<SortKey>(persisted.sort ?? "created_desc");
   const [page, setPage] = useState<number>(persisted.page ?? 0);
@@ -46,6 +51,7 @@ export default function Projects() {
   const [tagInput, setTagInput] = useState("");
   const [bulkBusy, setBulkBusy] = useState(false);
   const [zipProgress, setZipProgress] = useState<{ done: number; total: number } | null>(null);
+  const [pdfProgress, setPdfProgress] = useState<{ done: number; total: number } | null>(null);
 
   useEffect(() => {
     const t = setTimeout(() => {
@@ -65,19 +71,25 @@ export default function Projects() {
 
   useEffect(() => {
     setLoading(true);
-    listProjects({ search: debounced, filters, page, pageSize: PAGE_SIZE, sort })
+    listProjects({ search: debounced, searchTerms: chips.map((c) => c.value), filters, page, pageSize: PAGE_SIZE, sort })
       .then(({ rows, total }) => { setRows(rows); setTotal(total); })
       .finally(() => setLoading(false));
-  }, [debounced, JSON.stringify(filters), page, sort]);
+  }, [debounced, JSON.stringify(filters), page, sort, JSON.stringify(chips)]);
 
   // Persist state to sessionStorage on change
   useEffect(() => {
     try {
       sessionStorage.setItem(STORAGE_KEY, JSON.stringify({
-        search, filters, sort, page, scrollY: window.scrollY,
+        search, chips, filters, sort, page, scrollY: window.scrollY,
       }));
     } catch {}
-  }, [search, filtersKey, sort, page]);
+  }, [search, chips, filtersKey, sort, page]);
+
+  const addChip = (c: Chip) => {
+    setChips((prev) => prev.some((p) => p.type === c.type && p.value.toLowerCase() === c.value.toLowerCase()) ? prev : [...prev, c]);
+    setPage(0);
+  };
+  const removeChip = (i: number) => { setChips((prev) => prev.filter((_, idx) => idx !== i)); setPage(0); };
 
   // Restore scroll once results are loaded
   useEffect(() => {
@@ -157,6 +169,26 @@ export default function Projects() {
     finally { setBulkBusy(false); setZipProgress(null); }
   };
 
+  const downloadCombinedPdf = async () => {
+    if (!selected.size) return toast.error("Select projects first");
+    setBulkBusy(true);
+    setPdfProgress({ done: 0, total: selected.size });
+    try {
+      const ids = Array.from(selected);
+      const items: { project: ProjectRow; images: any[] }[] = [];
+      for (let i = 0; i < ids.length; i++) {
+        const { project, images } = await getProject(ids[i]);
+        if (project) items.push({ project, images });
+        setPdfProgress({ done: i + 1, total: ids.length });
+      }
+      if (!items.length) { toast.error("Nothing to export"); return; }
+      const doc = await buildCombinedPdf(items);
+      doc.save(`atlas-dam-${items.length}-projects.pdf`);
+      toast.success(`Exported ${items.length} project(s) to PDF`);
+    } catch (e: any) { toast.error(e.message ?? "PDF export failed"); }
+    finally { setBulkBusy(false); setPdfProgress(null); }
+  };
+
   return (
     <div>
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-8">
@@ -191,7 +223,25 @@ export default function Projects() {
 
         <div>
           <div className="flex flex-col sm:flex-row gap-3 mb-6">
-            <div className="flex-1"><SearchBar value={search} onChange={setSearch} /></div>
+            <div className="flex-1">
+              <SearchBar value={search} onChange={setSearch} onPickChip={addChip} />
+              {chips.length > 0 && (
+                <div className="flex flex-wrap gap-1.5 mt-2">
+                  {chips.map((c, i) => (
+                    <span key={`${c.type}:${c.value}:${i}`} className="inline-flex items-center gap-1.5 bg-secondary border border-border rounded-sm pl-2 pr-1 py-1 text-xs">
+                      <span className="text-[10px] uppercase tracking-widest text-muted-foreground">{c.type}</span>
+                      <span className="font-medium">{c.label}</span>
+                      <button onClick={() => removeChip(i)} className="hover:text-destructive transition-smooth p-0.5" aria-label="Remove">
+                        <X size={11} />
+                      </button>
+                    </span>
+                  ))}
+                  <button onClick={() => { setChips([]); setPage(0); }} className="text-xs text-muted-foreground hover:text-foreground underline-offset-2 hover:underline ml-1">
+                    Clear
+                  </button>
+                </div>
+              )}
+            </div>
             <SortMenu value={sort} onChange={setSort} />
           </div>
 
@@ -227,6 +277,14 @@ export default function Projects() {
               >
                 {bulkBusy && zipProgress ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
                 {zipProgress ? `${zipProgress.done}/${zipProgress.total}` : "Download images (ZIP)"}
+              </button>
+              <button
+                onClick={downloadCombinedPdf}
+                disabled={bulkBusy || !selected.size}
+                className="inline-flex items-center gap-2 px-3 py-1.5 border border-border rounded-sm text-sm disabled:opacity-40 hover:bg-secondary transition-smooth"
+              >
+                {bulkBusy && pdfProgress ? <Loader2 size={14} className="animate-spin" /> : <FileDown size={14} />}
+                {pdfProgress ? `${pdfProgress.done}/${pdfProgress.total}` : "Combined PDF"}
               </button>
               <button onClick={exitSelect} className="p-1.5 hover:bg-secondary rounded-sm transition-smooth"><X size={14} /></button>
             </div>

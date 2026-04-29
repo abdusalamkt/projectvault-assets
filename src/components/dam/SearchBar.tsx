@@ -7,10 +7,11 @@ interface Suggestion { label: string; type: string; value: string }
 interface Props {
   value: string;
   onChange: (v: string) => void;
+  onPickChip?: (chip: { label: string; type: string; value: string }) => void;
   placeholder?: string;
 }
 
-export default function SearchBar({ value, onChange, placeholder }: Props) {
+export default function SearchBar({ value, onChange, onPickChip, placeholder }: Props) {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [items, setItems] = useState<Suggestion[]>([]);
@@ -38,7 +39,12 @@ export default function SearchBar({ value, onChange, placeholder }: Props) {
   }, []);
 
   const choose = (s: Suggestion) => {
-    onChange(s.value);
+    if (onPickChip) {
+      onPickChip(s);
+      onChange("");
+    } else {
+      onChange(s.value);
+    }
     setOpen(false);
   };
 

@@ -56,16 +56,21 @@ export function autoTags(p: Partial<ProjectRow>): string[] {
 
 export interface ListParams {
   search?: string;
+  searchTerms?: string[];
   filters?: Partial<Record<FilterFieldExt, string[]>>;
   page?: number;
   pageSize?: number;
   sort?: SortKey;
 }
 
-export async function listProjects({ search, filters, page = 0, pageSize = 24, sort = "created_desc" }: ListParams) {
+export async function listProjects({ search, searchTerms, filters, page = 0, pageSize = 24, sort = "created_desc" }: ListParams) {
   let q = supabase.from("projects").select("*", { count: "exact" });
-  if (search?.trim()) {
-    const s = search.trim();
+  // Build a list of terms; each term must match (AND) across any text field.
+  const terms = [
+    ...(searchTerms ?? []).map((t) => t.trim()).filter(Boolean),
+    ...(search?.trim() ? [search.trim()] : []),
+  ];
+  for (const s of terms) {
     // Full-text via tsvector + fallback ILIKE for partial substrings (project no etc.)
     const tsq = s.split(/\s+/).filter(Boolean).map((w) => w.replace(/[:&|!()'\\]/g, "") + ":*").join(" & ");
     const safe = s.replace(/[%_,]/g, " ");
