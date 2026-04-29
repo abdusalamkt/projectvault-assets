@@ -30,17 +30,18 @@ const loadPersisted = (): Partial<PersistedState> => {
     return raw ? JSON.parse(raw) : {};
   } catch { return {}; }
 };
-const persisted = loadPersisted();
 
 export default function Projects() {
   const { session } = useAuth();
   const isAdmin = session?.role === "admin";
-  const [search, setSearch] = useState<string>(persisted.search ?? "");
-  const [debounced, setDebounced] = useState<string>(persisted.search ?? "");
-  const [chips, setChips] = useState<Chip[]>(persisted.chips ?? []);
-  const [filters, setFilters] = useState<Partial<Record<FilterFieldExt, string[]>>>(persisted.filters ?? {});
-  const [sort, setSort] = useState<SortKey>(persisted.sort ?? "created_desc");
-  const [page, setPage] = useState<number>(persisted.page ?? 0);
+  // Read once per mount so coming back from a project detail restores state.
+  const [initial] = useState<Partial<PersistedState>>(() => loadPersisted());
+  const [search, setSearch] = useState<string>(initial.search ?? "");
+  const [debounced, setDebounced] = useState<string>(initial.search ?? "");
+  const [chips, setChips] = useState<Chip[]>(initial.chips ?? []);
+  const [filters, setFilters] = useState<Partial<Record<FilterFieldExt, string[]>>>(initial.filters ?? {});
+  const [sort, setSort] = useState<SortKey>(initial.sort ?? "created_desc");
+  const [page, setPage] = useState<number>(initial.page ?? 0);
   const [rows, setRows] = useState<ProjectRow[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -53,20 +54,27 @@ export default function Projects() {
   const [zipProgress, setZipProgress] = useState<{ done: number; total: number } | null>(null);
   const [pdfProgress, setPdfProgress] = useState<{ done: number; total: number } | null>(null);
 
+  // Track whether the initial restore has happened so we don't reset page on first render.
+  const [restored, setRestored] = useState(false);
+  useEffect(() => { setRestored(true); }, []);
+
   useEffect(() => {
     const t = setTimeout(() => {
       setDebounced(search);
-      if (search !== (persisted.search ?? "")) setPage(0);
+      if (restored) setPage(0);
     }, 250);
     return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [search]);
 
   const filtersKey = JSON.stringify(filters);
   useEffect(() => {
-    if (filtersKey !== JSON.stringify(persisted.filters ?? {})) setPage(0);
+    if (restored) setPage(0);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filtersKey]);
   useEffect(() => {
-    if (sort !== (persisted.sort ?? "created_desc")) setPage(0);
+    if (restored) setPage(0);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sort]);
 
   useEffect(() => {
@@ -93,10 +101,10 @@ export default function Projects() {
 
   // Restore scroll once results are loaded
   useEffect(() => {
-    if (!loading && persisted.scrollY) {
-      const y = persisted.scrollY;
+    if (!loading && initial.scrollY) {
+      const y = initial.scrollY;
       requestAnimationFrame(() => window.scrollTo(0, y));
-      persisted.scrollY = 0;
+      initial.scrollY = 0;
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loading]);
@@ -131,6 +139,28 @@ export default function Projects() {
       else rows.forEach((r) => n.add(r.id));
       return n;
     });
+  };
+
+  const selectAllResults = async () => {
+    setBulkBusy(true);
+    try {
+      // Fetch every matching project id across all pages.
+      const all: ProjectRow[] = [];
+      const size = 200;
+      let p = 0;
+      while (true) {
+        const { rows: batch, total: tot } = await listProjects({
+          search: debounced, searchTerms: chips.map((c) => c.value), filters, page: p, pageSize: size, sort,
+        });
+        all.push(...batch);
+        if (all.length >= tot || batch.length === 0) break;
+        p++;
+        if (p > 200) break; // safety
+      }
+      setSelected(new Set(all.map((r) => r.id)));
+      toast.success(`Selected ${all.length} project(s)`);
+    } catch (e: any) { toast.error(e.message ?? "Select all failed"); }
+    finally { setBulkBusy(false); }
   };
 
   const exitSelect = () => { setSelectMode(false); setSelected(new Set()); setTagInput(""); };
@@ -250,6 +280,21 @@ export default function Projects() {
               <button onClick={selectAllOnPage} className="text-xs uppercase tracking-widest text-muted-foreground hover:text-foreground">
                 {rows.every((r) => selected.has(r.id)) && rows.length > 0 ? "Unselect page" : "Select page"}
               </button>
+              <button
+                onClick={selectAllResults}
+                disabled={bulkBusy || total === 0}
+                className="text-xs uppercase tracking-widest text-gold hover:text-gold/80 disabled:opacity-40"
+              >
+                Select all ({total})
+              </button>
+              {selected.size > 0 && (
+                <button
+                  onClick={() => setSelected(new Set())}
+                  className="text-xs uppercase tracking-widest text-muted-foreground hover:text-foreground"
+                >
+                  Clear
+                </button>
+              )}
               <span className="text-sm font-medium">
                 {selected.size} selected
               </span>
