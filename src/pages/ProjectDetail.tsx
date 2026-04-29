@@ -5,7 +5,7 @@ import { useAuth } from "@/context/AuthContext";
 import { ArrowLeft, Download, Edit, Trash2, Upload, X, Loader2, FileDown, Plus } from "lucide-react";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
-import { downloadAsZip, downloadSingleImage, fetchAsBlob, fileNameFromUrl } from "@/lib/download";
+import { downloadAsZip, downloadSingleImage, fileNameFromUrl } from "@/lib/download";
 import { buildSingleProjectPdf } from "@/lib/pdf";
 
 export default function ProjectDetail() {
