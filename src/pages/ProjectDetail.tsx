@@ -5,8 +5,8 @@ import { useAuth } from "@/context/AuthContext";
 import { ArrowLeft, Download, Edit, Trash2, Upload, X, Loader2, FileDown, Plus } from "lucide-react";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
-import jsPDF from "jspdf";
 import { downloadAsZip, downloadSingleImage, fetchAsBlob, fileNameFromUrl } from "@/lib/download";
+import { buildSingleProjectPdf } from "@/lib/pdf";
 
 export default function ProjectDetail() {
   const { id } = useParams();
@@ -75,79 +75,7 @@ export default function ProjectDetail() {
     if (!project) return;
     setPdfBusy(true);
     try {
-      const doc = new jsPDF({ unit: "mm", format: "a4" });
-      const pageW = doc.internal.pageSize.getWidth();
-      const pageH = doc.internal.pageSize.getHeight();
-      const margin = 14;
-
-      doc.setFontSize(20); doc.text(project.project_name, margin, 22);
-      doc.setFontSize(11); doc.setTextColor(120);
-      doc.text(`Project No: ${project.project_no}`, margin, 30);
-      let y = 42;
-      doc.setTextColor(20); doc.setFontSize(11);
-      const fields: [string, string | null | undefined][] = [
-        ["Sector", project.sector], ["Country", project.country],
-        ["Product", project.product], ["Finish", project.finish],
-        ["Contractor", project.contractor],
-      ];
-      for (const [k, v] of fields) {
-        doc.setFont("helvetica", "bold"); doc.text(`${k}:`, margin, y);
-        doc.setFont("helvetica", "normal"); doc.text(v || "—", margin + 36, y);
-        y += 8;
-      }
-      if (project.description) {
-        y += 4; doc.setFont("helvetica", "bold"); doc.text("Description", margin, y); y += 6;
-        doc.setFont("helvetica", "normal");
-        const wrapped = doc.splitTextToSize(project.description, pageW - margin * 2);
-        doc.text(wrapped, margin, y); y += wrapped.length * 5 + 4;
-      }
-      if (project.tags.length) {
-        doc.setFont("helvetica", "bold"); doc.text("Tags:", margin, y);
-        doc.setFont("helvetica", "normal"); doc.text(project.tags.join(", "), margin + 18, y);
-        y += 8;
-      }
-
-      // Images: 2 per row
-      if (images.length) {
-        doc.addPage();
-        doc.setFontSize(14); doc.setFont("helvetica", "bold");
-        doc.text("Images", margin, 18);
-        const cols = 2;
-        const gap = 6;
-        const cellW = (pageW - margin * 2 - gap * (cols - 1)) / cols;
-        const cellH = cellW * 0.75;
-        let cx = margin;
-        let cy = 24;
-        let i = 0;
-        for (const img of images) {
-          try {
-            const blob = await fetchAsBlob(img.url);
-            const dataUrl: string = await new Promise((res, rej) => {
-              const r = new FileReader();
-              r.onload = () => res(r.result as string);
-              r.onerror = rej;
-              r.readAsDataURL(blob);
-            });
-            // Detect format
-            const fmt = dataUrl.startsWith("data:image/png") ? "PNG" : "JPEG";
-            doc.addImage(dataUrl, fmt as any, cx, cy, cellW, cellH, undefined, "FAST");
-          } catch {
-            doc.setDrawColor(200); doc.rect(cx, cy, cellW, cellH);
-            doc.setFontSize(8); doc.setTextColor(150);
-            doc.text("Image unavailable", cx + 4, cy + 10);
-          }
-          i++;
-          if (i % cols === 0) {
-            cx = margin; cy += cellH + gap;
-            if (cy + cellH > pageH - margin && i < images.length) {
-              doc.addPage(); cy = margin;
-            }
-          } else {
-            cx += cellW + gap;
-          }
-        }
-      }
-
+      const doc = await buildSingleProjectPdf(project, images);
       doc.save(`${project.project_no}-${project.project_name}.pdf`);
       toast.success("PDF exported");
     } catch (e: any) {
