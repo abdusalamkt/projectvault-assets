@@ -280,6 +280,21 @@ export default function Projects() {
               <button onClick={selectAllOnPage} className="text-xs uppercase tracking-widest text-muted-foreground hover:text-foreground">
                 {rows.every((r) => selected.has(r.id)) && rows.length > 0 ? "Unselect page" : "Select page"}
               </button>
+              <button
+                onClick={selectAllResults}
+                disabled={bulkBusy || total === 0}
+                className="text-xs uppercase tracking-widest text-gold hover:text-gold/80 disabled:opacity-40"
+              >
+                Select all ({total})
+              </button>
+              {selected.size > 0 && (
+                <button
+                  onClick={() => setSelected(new Set())}
+                  className="text-xs uppercase tracking-widest text-muted-foreground hover:text-foreground"
+                >
+                  Clear
+                </button>
+              )}
               <span className="text-sm font-medium">
                 {selected.size} selected
               </span>
