@@ -339,9 +339,16 @@ function FileCard({ f, isAdmin, onEdit, onDelete }: {
   f: LibraryFile; isAdmin: boolean; onEdit: () => void; onDelete: () => void;
 }) {
   const kind = fileKind(f.mime_type, f.name);
+  const openable = kind === "image" || kind === "video" || kind === "pdf" || kind === "audio";
+  const openInNewTab = () => window.open(f.url, "_blank", "noopener,noreferrer");
   return (
     <div className="group relative bg-card border border-border rounded-md overflow-hidden transition-smooth hover:border-gold hover:shadow-lift hover:-translate-y-0.5 animate-scale-in">
-      <div className="aspect-square bg-secondary/50 flex items-center justify-center relative overflow-hidden">
+      <button
+        type="button"
+        onClick={openable ? openInNewTab : undefined}
+        title={openable ? "Open in new tab" : undefined}
+        className={`aspect-square w-full bg-secondary/50 flex items-center justify-center relative overflow-hidden ${openable ? "cursor-zoom-in" : "cursor-default"}`}
+      >
         {kind === "image" ? (
           <img src={f.url} alt={f.title ?? f.name} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" loading="lazy" />
         ) : kind === "video" ? (
@@ -352,9 +359,17 @@ function FileCard({ f, isAdmin, onEdit, onDelete }: {
         <span className="absolute top-2 left-2 text-[10px] uppercase tracking-widest bg-background/85 backdrop-blur px-1.5 py-0.5 rounded-sm">
           {kind}
         </span>
-      </div>
+      </button>
       <div className="p-3 space-y-1">
-        <div className="font-medium text-sm truncate" title={f.title ?? f.name}>{f.title ?? f.name}</div>
+        {openable ? (
+          <button onClick={openInNewTab} className="font-medium text-sm truncate text-left w-full hover:text-gold transition-smooth" title={`Open ${f.title ?? f.name}`}>
+            {f.title ?? f.name}
+          </button>
+        ) : (
+          <a href={f.url} target="_blank" rel="noreferrer" className="font-medium text-sm truncate block hover:text-gold transition-smooth" title={f.title ?? f.name}>
+            {f.title ?? f.name}
+          </a>
+        )}
         <div className="text-[11px] text-muted-foreground flex items-center justify-between gap-2">
           <span className="truncate">{f.category ?? "—"}</span>
           <span>{formatBytes(f.size_bytes)}</span>
