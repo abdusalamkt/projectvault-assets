@@ -123,4 +123,8 @@ All colors MUST be HSL.
   .shadow-lift { box-shadow: var(--shadow-lift); }
   .bg-hero { background: var(--gradient-hero); }
   .transition-smooth { transition: all 0.3s var(--transition-smooth); }
+  .hover-scale { @apply transition-transform duration-200 hover:scale-[1.03]; }
+  .input {
+    @apply w-full bg-background border border-border rounded-sm px-3 py-2 text-sm focus:outline-none focus:border-gold transition-smooth disabled:opacity-60;
+  }
 }
