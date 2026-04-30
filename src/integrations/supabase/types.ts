@@ -14,6 +14,106 @@ export type Database = {
   }
   public: {
     Tables: {
+      library_files: {
+        Row: {
+          category: string | null
+          created_at: string
+          description: string | null
+          folder_id: string | null
+          id: string
+          mime_type: string | null
+          name: string
+          search_tsv: unknown
+          size_bytes: number
+          storage_path: string
+          tags: string[]
+          title: string | null
+          updated_at: string
+          url: string
+          year: number | null
+        }
+        Insert: {
+          category?: string | null
+          created_at?: string
+          description?: string | null
+          folder_id?: string | null
+          id?: string
+          mime_type?: string | null
+          name: string
+          search_tsv?: unknown
+          size_bytes?: number
+          storage_path: string
+          tags?: string[]
+          title?: string | null
+          updated_at?: string
+          url: string
+          year?: number | null
+        }
+        Update: {
+          category?: string | null
+          created_at?: string
+          description?: string | null
+          folder_id?: string | null
+          id?: string
+          mime_type?: string | null
+          name?: string
+          search_tsv?: unknown
+          size_bytes?: number
+          storage_path?: string
+          tags?: string[]
+          title?: string | null
+          updated_at?: string
+          url?: string
+          year?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "library_files_folder_id_fkey"
+            columns: ["folder_id"]
+            isOneToOne: false
+            referencedRelation: "library_folders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      library_folders: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+          parent_folder_id: string | null
+          path: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name: string
+          parent_folder_id?: string | null
+          path?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
+          parent_folder_id?: string | null
+          path?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "library_folders_parent_folder_id_fkey"
+            columns: ["parent_folder_id"]
+            isOneToOne: false
+            referencedRelation: "library_folders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       project_images: {
         Row: {
           created_at: string
@@ -105,6 +205,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      library_folder_compute_path: { Args: { _id: string }; Returns: string }
       show_limit: { Args: never; Returns: number }
       show_trgm: { Args: { "": string }; Returns: string[] }
     }
