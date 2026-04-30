@@ -1,6 +1,6 @@
 import { Link, NavLink, Outlet, useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
-import { LogOut, LayoutDashboard, FolderKanban, Upload } from "lucide-react";
+import { LogOut, LayoutDashboard, FolderKanban, Upload, Library } from "lucide-react";
 
 export default function Layout() {
   const { session, logout } = useAuth();
@@ -15,13 +15,14 @@ export default function Layout() {
             <span className="w-8 h-8 rounded-sm bg-hero flex items-center justify-center">
               <span className="font-display text-gold font-bold text-lg leading-none">A</span>
             </span>
-            <span className="font-display text-xl font-semibold tracking-tight">Atlas DAM</span>
+            <span className="font-display text-xl font-semibold tracking-tight">GIBCA DAM</span>
           </Link>
           <nav className="hidden md:flex items-center gap-1">
             {isAdmin && (
               <NavItem to="/dashboard" icon={<LayoutDashboard size={16} />}>Dashboard</NavItem>
             )}
             <NavItem to="/projects" icon={<FolderKanban size={16} />}>Projects</NavItem>
+            <NavItem to="/library" icon={<Library size={16} />}>Library</NavItem>
             {isAdmin && <NavItem to="/import" icon={<Upload size={16} />}>Import</NavItem>}
           </nav>
           <div className="flex items-center gap-3">
@@ -38,9 +39,9 @@ export default function Layout() {
           </div>
         </div>
       </header>
-      <main className="flex-1 container py-8"><Outlet /></main>
+      <main className="flex-1 container py-8 animate-fade-in"><Outlet /></main>
       <footer className="border-t border-border py-6 text-center text-xs text-muted-foreground">
-        Atlas DAM · Internal project & image library
+        GIBCA DAM · Internal project & asset library
       </footer>
     </div>
   );

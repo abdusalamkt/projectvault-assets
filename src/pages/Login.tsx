@@ -27,9 +27,9 @@ export default function Login() {
         <div className="relative z-10">
           <div className="flex items-center gap-2">
             <span className="w-9 h-9 rounded-sm bg-gold flex items-center justify-center">
-              <span className="font-display text-primary font-bold">A</span>
+              <span className="font-display text-primary font-bold">G</span>
             </span>
-            <span className="font-display text-2xl font-semibold">Atlas DAM</span>
+            <span className="font-display text-2xl font-semibold">GIBCA DAM</span>
           </div>
         </div>
         <motion.div
