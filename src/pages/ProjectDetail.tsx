@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { deleteImage, deleteProject, getProject, ProjectImage, ProjectRow, uploadImage, addImageUrls, setProjectTags } from "@/lib/dam";
+import { deleteImage, deleteProject, getProject, ProjectImage, ProjectRow, uploadImage, addImageUrls, setProjectTags, setImageTags } from "@/lib/dam";
 import { useAuth } from "@/context/AuthContext";
-import { ArrowLeft, Download, Edit, Trash2, Upload, X, Loader2, FileDown, Plus } from "lucide-react";
+import { ArrowLeft, Download, Edit, Trash2, Upload, X, Loader2, FileDown, Plus, Tag } from "lucide-react";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { downloadAsZip, downloadSingleImage, fileNameFromUrl } from "@/lib/download";
@@ -253,12 +253,94 @@ export default function ProjectDetail() {
       </div>
 
       {lightbox !== null && images[lightbox] && (
-        <div onClick={() => setLightbox(null)}
-          className="fixed inset-0 bg-foreground/90 z-50 flex items-center justify-center p-6 cursor-zoom-out">
-          <button className="absolute top-4 right-4 text-background p-2"><X /></button>
-          <img src={images[lightbox].url} alt="" className="max-w-full max-h-full object-contain" />
-        </div>
+        <ImageDetailOverlay
+          image={images[lightbox]}
+          isAdmin={isAdmin}
+          onClose={() => setLightbox(null)}
+          onPrev={lightbox > 0 ? () => setLightbox(lightbox - 1) : undefined}
+          onNext={lightbox < images.length - 1 ? () => setLightbox(lightbox + 1) : undefined}
+          onSaved={(next) => setImages((prev) => prev.map((im) => im.id === next.id ? next : im))}
+        />
       )}
+    </div>
+  );
+}
+
+function ImageDetailOverlay({
+  image, isAdmin, onClose, onPrev, onNext, onSaved,
+}: {
+  image: ProjectImage;
+  isAdmin: boolean;
+  onClose: () => void;
+  onPrev?: () => void;
+  onNext?: () => void;
+  onSaved: (next: ProjectImage) => void;
+}) {
+  const [tags, setTags] = useState<string[]>(image.tags ?? []);
+  const [draft, setDraft] = useState("");
+  const [busy, setBusy] = useState(false);
+  useEffect(() => { setTags(image.tags ?? []); setDraft(""); }, [image.id]);
+  const persist = async (next: string[]) => {
+    setBusy(true);
+    try {
+      const saved = await setImageTags(image.id, next);
+      setTags(saved); onSaved({ ...image, tags: saved });
+    } catch (e: any) { toast.error(e.message); }
+    finally { setBusy(false); }
+  };
+  const addTag = () => {
+    const t = draft.trim();
+    if (!t || tags.includes(t)) { setDraft(""); return; }
+    persist([...tags, t]); setDraft("");
+  };
+  const removeTag = (t: string) => persist(tags.filter((x) => x !== t));
+
+  return (
+    <div className="fixed inset-0 bg-foreground/95 z-50 flex flex-col p-4 md:p-8" onClick={onClose}>
+      <div className="flex items-center justify-end gap-2 text-background mb-4" onClick={(e) => e.stopPropagation()}>
+        <button
+          onClick={() => downloadSingleImage(image.url, fileNameFromUrl(image.url)).catch((e) => toast.error(e.message))}
+          className="inline-flex items-center gap-2 px-3 py-2 border border-background/40 rounded-sm text-sm hover:bg-background/10"
+        ><Download size={14} /> Download</button>
+        <button onClick={onClose} className="p-2 hover:bg-background/10 rounded-sm"><X /></button>
+      </div>
+      <div className="flex-1 flex items-center justify-center min-h-0 relative" onClick={(e) => e.stopPropagation()}>
+        {onPrev && <button onClick={onPrev} className="absolute left-2 text-background/70 hover:text-background p-3 text-2xl">‹</button>}
+        <img src={image.url} alt="" className="max-w-full max-h-full object-contain" />
+        {onNext && <button onClick={onNext} className="absolute right-2 text-background/70 hover:text-background p-3 text-2xl">›</button>}
+      </div>
+      <div className="mt-4 bg-card rounded-sm p-4 max-w-3xl w-full mx-auto" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center gap-2 mb-2">
+          <Tag size={14} className="text-gold" />
+          <span className="text-xs uppercase tracking-widest text-muted-foreground">Image tags</span>
+        </div>
+        <div className="flex flex-wrap gap-1.5 mb-2">
+          {tags.length === 0 && <span className="text-xs text-muted-foreground">No tags yet</span>}
+          {tags.map((t) => (
+            <span key={t} className="inline-flex items-center gap-1 text-xs bg-secondary px-2 py-1 rounded-sm">
+              {t}
+              {isAdmin && (
+                <button onClick={() => removeTag(t)} disabled={busy} className="hover:text-destructive"><X size={10} /></button>
+              )}
+            </span>
+          ))}
+        </div>
+        {isAdmin && (
+          <div className="flex gap-1.5">
+            <input
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addTag(); } }}
+              placeholder="Add tag…"
+              className="flex-1 bg-background border border-border rounded-sm px-2 py-1.5 text-sm focus:outline-none focus:border-gold"
+            />
+            <button onClick={addTag} disabled={busy || !draft.trim()}
+              className="px-3 py-1.5 bg-primary text-primary-foreground rounded-sm text-sm disabled:opacity-40 inline-flex items-center gap-1">
+              <Plus size={12} /> Add
+            </button>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
