@@ -1,6 +1,6 @@
 import { Link, NavLink, Outlet, useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
-import { LogOut, LayoutDashboard, FolderKanban, Upload, Library } from "lucide-react";
+import { LogOut, LayoutDashboard, FolderKanban, Upload, Library, Image as ImageIcon } from "lucide-react";
 
 export default function Layout() {
   const { session, logout } = useAuth();
@@ -22,6 +22,7 @@ export default function Layout() {
               <NavItem to="/dashboard" icon={<LayoutDashboard size={16} />}>Dashboard</NavItem>
             )}
             <NavItem to="/projects" icon={<FolderKanban size={16} />}>Projects</NavItem>
+            <NavItem to="/images" icon={<ImageIcon size={16} />}>Images</NavItem>
             <NavItem to="/library" icon={<Library size={16} />}>Library</NavItem>
             {isAdmin && <NavItem to="/import" icon={<Upload size={16} />}>Import</NavItem>}
           </nav>
