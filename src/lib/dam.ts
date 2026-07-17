@@ -217,6 +217,92 @@ export async function getImagesForProjects(projectIds: string[]) {
   })) as (ProjectImage & { project_no: string; project_name: string })[];
 }
 
+export interface ImageWithProject extends ProjectImage {
+  project_no: string;
+  project_name: string;
+  project_sector: string | null;
+  project_country: string | null;
+}
+
+export interface ListImagesParams {
+  search?: string;
+  searchTerms?: string[];
+  filters?: Partial<Record<FilterFieldExt, string[]>>;
+  tags?: string[];
+  page?: number;
+  pageSize?: number;
+  sort?: "created_desc" | "created_asc";
+}
+
+export async function listImages({
+  search, searchTerms, filters, tags, page = 0, pageSize = 48, sort = "created_desc",
+}: ListImagesParams) {
+  const hasProjectFilter =
+    (search && search.trim().length > 0) ||
+    (searchTerms && searchTerms.length > 0) ||
+    Object.values(filters ?? {}).some((v) => v && v.length > 0);
+
+  let projectIds: string[] | null = null;
+  if (hasProjectFilter) {
+    // Resolve matching project IDs (cap at 2000 for perf).
+    const { rows } = await listProjects({
+      search, searchTerms, filters, page: 0, pageSize: 2000, sort: "created_desc",
+    });
+    projectIds = rows.map((r) => r.id);
+    if (projectIds.length === 0) return { rows: [] as ImageWithProject[], total: 0 };
+  }
+
+  let q = supabase
+    .from("project_images")
+    .select("*, projects!inner(project_no, project_name, sector, country)", { count: "exact" });
+  if (projectIds) q = q.in("project_id", projectIds);
+  if (tags && tags.length) q = q.overlaps("tags", tags);
+
+  const asc = sort === "created_asc";
+  q = q.order("created_at", { ascending: asc })
+       .range(page * pageSize, page * pageSize + pageSize - 1);
+
+  const { data, error, count } = await q;
+  if (error) throw error;
+  const rows = (data ?? []).map((r: any) => ({
+    ...r,
+    project_no: r.projects.project_no,
+    project_name: r.projects.project_name,
+    project_sector: r.projects.sector,
+    project_country: r.projects.country,
+  })) as ImageWithProject[];
+  return { rows, total: count ?? 0 };
+}
+
+export async function setImageTags(imageId: string, tags: string[]) {
+  const clean = Array.from(new Set(tags.map((t) => t.trim()).filter(Boolean)));
+  const { error } = await supabase.from("project_images").update({ tags: clean }).eq("id", imageId);
+  if (error) throw error;
+  return clean;
+}
+
+export async function addImageTags(imageId: string, newTags: string[]) {
+  const { data, error } = await supabase.from("project_images").select("tags").eq("id", imageId).single();
+  if (error) throw error;
+  const merged = Array.from(new Set([...(data?.tags ?? []), ...newTags.map((t) => t.trim()).filter(Boolean)]));
+  const { error: e2 } = await supabase.from("project_images").update({ tags: merged }).eq("id", imageId);
+  if (e2) throw e2;
+  return merged;
+}
+
+export async function bulkAddImageTags(imageIds: string[], newTags: string[]) {
+  const clean = newTags.map((t) => t.trim()).filter(Boolean);
+  if (!clean.length || !imageIds.length) return;
+  const { data, error } = await supabase.from("project_images").select("id, tags").in("id", imageIds);
+  if (error) throw error;
+  await Promise.all(
+    (data ?? []).map((row: any) => {
+      const merged = Array.from(new Set([...(row.tags ?? []), ...clean]));
+      return supabase.from("project_images").update({ tags: merged }).eq("id", row.id);
+    })
+  );
+}
+
 /** Suggestions for the global search bar */
 export async function searchSuggestions(term: string, limit = 8) {
   const s = term.trim();

@@ -15,6 +15,7 @@ import ProjectForm from "./pages/ProjectForm";
 import Import from "./pages/Import";
 import Index from "./pages/Index";
 import Library from "./pages/Library";
+import Images from "./pages/Images";
 
 const queryClient = new QueryClient();
 
@@ -32,6 +33,7 @@ const App = () => (
               <Route path="/projects" element={<Projects />} />
               <Route path="/projects/:id" element={<ProjectDetail />} />
               <Route path="/library" element={<Library />} />
+              <Route path="/images" element={<Images />} />
             </Route>
             <Route element={<RequireRole role="admin"><Layout /></RequireRole>}>
               <Route path="/dashboard" element={<Dashboard />} />
