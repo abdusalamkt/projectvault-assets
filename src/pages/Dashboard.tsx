@@ -4,7 +4,7 @@ import { stats } from "@/lib/dam";
 import { supabase } from "@/integrations/supabase/client";
 import {
   FolderKanban, Image as ImageIcon, Plus, Upload, Tag, Globe, Package,
-  Hammer, Layers, Sparkles, Building2,
+  Hammer, Layers, Sparkles, Building2, Search,
 } from "lucide-react";
 import { motion } from "framer-motion";
 import { useAuth } from "@/context/AuthContext";
@@ -12,19 +12,31 @@ import { useAuth } from "@/context/AuthContext";
 type Chip = { label: string; type: string; value: string };
 const PROJECTS_STATE_KEY = "atlas-dam:projects-state";
 
+const FILTER_TYPES: Record<string, string> = {
+  Sector: "sector",
+  Country: "country",
+  Product: "product",
+  Finish: "finish",
+  Contractor: "contractor",
+};
+
 function jumpToProjects(nav: (p: string) => void, chip: Chip) {
+  const filterField = FILTER_TYPES[chip.type];
+  const state: any = {
+    search: "",
+    chips: [],
+    filters: {},
+    sort: "created_desc",
+    page: 0,
+    scrollY: 0,
+  };
+  if (filterField) {
+    state.filters = { [filterField]: [chip.value] };
+  } else {
+    state.chips = [chip];
+  }
   try {
-    sessionStorage.setItem(
-      PROJECTS_STATE_KEY,
-      JSON.stringify({
-        search: "",
-        chips: [chip],
-        filters: {},
-        sort: "created_desc",
-        page: 0,
-        scrollY: 0,
-      })
-    );
+    sessionStorage.setItem(PROJECTS_STATE_KEY, JSON.stringify(state));
   } catch { /* ignore */ }
   nav("/projects");
 }
@@ -180,8 +192,12 @@ function ChipSection({
   hideCount?: boolean;
 }) {
   const [expanded, setExpanded] = useState(false);
+  const [q, setQ] = useState("");
   if (!items.length) return null;
-  const shown = expanded ? items : items.slice(0, 30);
+  const filtered = q.trim()
+    ? items.filter(([v]) => v.toLowerCase().includes(q.trim().toLowerCase()))
+    : items;
+  const shown = expanded || q.trim() ? filtered : filtered.slice(0, 30);
   return (
     <motion.section
       initial={{ opacity: 0, y: 6 }}
@@ -195,7 +211,7 @@ function ChipSection({
           {title}
           <span className="text-xs text-muted-foreground font-sans font-normal">({items.length})</span>
         </h3>
-        {items.length > 30 && (
+        {items.length > 30 && !q.trim() && (
           <button
             onClick={() => setExpanded((v) => !v)}
             className="text-xs text-muted-foreground hover:text-gold transition-smooth"
@@ -204,7 +220,21 @@ function ChipSection({
           </button>
         )}
       </div>
+      {items.length > 10 && (
+        <div className="relative mb-3">
+          <Search size={12} className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground" />
+          <input
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder={`Search ${title.toLowerCase()}…`}
+            className="w-full bg-background border border-border rounded-sm pl-7 pr-2 py-1.5 text-xs focus:outline-none focus:border-gold transition-smooth"
+          />
+        </div>
+      )}
       <div className="flex flex-wrap gap-1.5">
+        {shown.length === 0 && (
+          <p className="text-xs text-muted-foreground">No matches</p>
+        )}
         {shown.map(([value, count]) => (
           <button
             key={value}

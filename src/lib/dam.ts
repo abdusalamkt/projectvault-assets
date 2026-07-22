@@ -361,6 +361,18 @@ export async function searchSuggestions(term: string, limit = 8) {
     add("Accessories", r.accessories);
     (r.tags ?? []).forEach((t: string) => add("Tag", t));
   });
+  // Also scan project tag arrays directly (tags added manually aren't reachable
+  // via the text-column .or filter above).
+  try {
+    const { data: tagRows } = await supabase
+      .from("projects")
+      .select("tags")
+      .not("tags", "eq", "{}")
+      .limit(2000);
+    (tagRows ?? []).forEach((r: any) => {
+      (r.tags ?? []).forEach((t: string) => add("Tag", t));
+    });
+  } catch { /* ignore */ }
   // Also pull image tags that match the term.
   try {
     const { data: imgs } = await supabase
