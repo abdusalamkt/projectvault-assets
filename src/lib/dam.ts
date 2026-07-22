@@ -10,10 +10,22 @@ export interface ProjectRow {
   finish: string | null;
   contractor: string | null;
   description: string | null;
+  brand: string | null;
+  speciality: string | null;
+  accessories: string | null;
   tags: string[];
   created_at: string;
   updated_at: string;
 }
+
+export const BRAND_OPTIONS = [
+  "HPL",
+  "Hufcor",
+  "Auralis",
+  "Pivot Doors",
+  "Hydraulic Doors",
+  "Terrace Solutions",
+] as const;
 
 export interface ProjectImage {
   id: string;
@@ -82,8 +94,21 @@ export async function listProjects({ search, searchTerms, filters, page = 0, pag
       `country.ilike.%${safe}%`,
       `product.ilike.%${safe}%`,
       `finish.ilike.%${safe}%`,
+      `brand.ilike.%${safe}%`,
+      `speciality.ilike.%${safe}%`,
+      `accessories.ilike.%${safe}%`,
       `description.ilike.%${safe}%`,
     ];
+    // Also include projects that have an image tagged with this term (exact-array match).
+    try {
+      const { data: imgRows } = await supabase
+        .from("project_images")
+        .select("project_id")
+        .contains("tags", [s])
+        .limit(2000);
+      const ids = Array.from(new Set((imgRows ?? []).map((r: any) => r.project_id))).filter(Boolean);
+      if (ids.length) ors.push(`id.in.(${ids.join(",")})`);
+    } catch { /* ignore */ }
     if (tsq) {
       q = q.or(`search_tsv.fts.${tsq},${ors.join(",")}`);
     } else {
@@ -310,9 +335,9 @@ export async function searchSuggestions(term: string, limit = 8) {
   const safe = s.replace(/[%_,]/g, " ");
   const { data, error } = await supabase
     .from("projects")
-    .select("project_no, project_name, contractor, sector, country, product, finish, tags")
+    .select("project_no, project_name, contractor, sector, country, product, finish, brand, speciality, accessories, tags")
     .or(
-      `project_no.ilike.%${safe}%,project_name.ilike.%${safe}%,contractor.ilike.%${safe}%,sector.ilike.%${safe}%,country.ilike.%${safe}%,product.ilike.%${safe}%,finish.ilike.%${safe}%`
+      `project_no.ilike.%${safe}%,project_name.ilike.%${safe}%,contractor.ilike.%${safe}%,sector.ilike.%${safe}%,country.ilike.%${safe}%,product.ilike.%${safe}%,finish.ilike.%${safe}%,brand.ilike.%${safe}%,speciality.ilike.%${safe}%,accessories.ilike.%${safe}%`
     )
     .limit(40);
   if (error) throw error;
@@ -331,8 +356,27 @@ export async function searchSuggestions(term: string, limit = 8) {
     add("Country", r.country);
     add("Product", r.product);
     add("Finish", r.finish);
+    add("Brand", r.brand);
+    add("Speciality", r.speciality);
+    add("Accessories", r.accessories);
     (r.tags ?? []).forEach((t: string) => add("Tag", t));
   });
+  // Also pull image tags that match the term.
+  try {
+    const { data: imgs } = await supabase
+      .from("project_images")
+      .select("tags")
+      .not("tags", "eq", "{}")
+      .limit(1000);
+    (imgs ?? []).forEach((r: any) => {
+      (r.tags ?? []).forEach((t: string) => {
+        if (t && t.toLowerCase().includes(lower)) {
+          const k = `Image Tag:${t.toLowerCase()}`;
+          if (!out.has(k)) out.set(k, { label: t, type: "Image Tag", value: t });
+        }
+      });
+    });
+  } catch { /* ignore */ }
   return Array.from(out.values()).slice(0, limit);
 }
 
