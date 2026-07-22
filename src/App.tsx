@@ -30,13 +30,13 @@ const App = () => (
             <Route path="/" element={<Index />} />
             <Route path="/login" element={<Login />} />
             <Route element={<RequireRole><Layout /></RequireRole>}>
+              <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/projects" element={<Projects />} />
               <Route path="/projects/:id" element={<ProjectDetail />} />
               <Route path="/library" element={<Library />} />
               <Route path="/images" element={<Images />} />
             </Route>
             <Route element={<RequireRole role="admin"><Layout /></RequireRole>}>
-              <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/projects/new" element={<ProjectForm />} />
               <Route path="/projects/:id/edit" element={<ProjectForm />} />
               <Route path="/import" element={<Import />} />

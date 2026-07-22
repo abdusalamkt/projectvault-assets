@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { getProject, ProjectRow, upsertProject } from "@/lib/dam";
+import { getProject, ProjectRow, upsertProject, BRAND_OPTIONS } from "@/lib/dam";
 import { ArrowLeft, Save, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -12,6 +12,8 @@ const FIELDS: { key: keyof ProjectRow; label: string; required?: boolean; textar
   { key: "product", label: "Product" },
   { key: "finish", label: "Finish" },
   { key: "contractor", label: "Contractor" },
+  { key: "speciality", label: "Speciality" },
+  { key: "accessories", label: "Accessories" },
   { key: "description", label: "Description", textarea: true },
 ];
 
@@ -53,6 +55,19 @@ export default function ProjectForm() {
       <p className="text-muted-foreground mb-8">Tags are auto-generated from sector, country, product, and finish.</p>
 
       <form onSubmit={submit} className="space-y-5 bg-card border border-border rounded-sm p-6 shadow-soft">
+        <div>
+          <label className="block text-xs uppercase tracking-widest text-muted-foreground mb-1">Brand</label>
+          <select
+            value={(form.brand as string) ?? ""}
+            onChange={(e) => setForm({ ...form, brand: e.target.value || null })}
+            className="w-full bg-background border border-border rounded-sm px-3 py-2 focus:outline-none focus:border-gold transition-smooth"
+          >
+            <option value="">— Select brand —</option>
+            {BRAND_OPTIONS.map((b) => (
+              <option key={b} value={b}>{b}</option>
+            ))}
+          </select>
+        </div>
         {FIELDS.map((f) => (
           <div key={f.key as string}>
             <label className="block text-xs uppercase tracking-widest text-muted-foreground mb-1">
