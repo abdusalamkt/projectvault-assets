@@ -12,19 +12,31 @@ import { useAuth } from "@/context/AuthContext";
 type Chip = { label: string; type: string; value: string };
 const PROJECTS_STATE_KEY = "atlas-dam:projects-state";
 
+const FILTER_TYPES: Record<string, string> = {
+  Sector: "sector",
+  Country: "country",
+  Product: "product",
+  Finish: "finish",
+  Contractor: "contractor",
+};
+
 function jumpToProjects(nav: (p: string) => void, chip: Chip) {
+  const filterField = FILTER_TYPES[chip.type];
+  const state: any = {
+    search: "",
+    chips: [],
+    filters: {},
+    sort: "created_desc",
+    page: 0,
+    scrollY: 0,
+  };
+  if (filterField) {
+    state.filters = { [filterField]: [chip.value] };
+  } else {
+    state.chips = [chip];
+  }
   try {
-    sessionStorage.setItem(
-      PROJECTS_STATE_KEY,
-      JSON.stringify({
-        search: "",
-        chips: [chip],
-        filters: {},
-        sort: "created_desc",
-        page: 0,
-        scrollY: 0,
-      })
-    );
+    sessionStorage.setItem(PROJECTS_STATE_KEY, JSON.stringify(state));
   } catch { /* ignore */ }
   nav("/projects");
 }
