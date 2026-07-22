@@ -18,9 +18,7 @@ export default function Layout() {
             <span className="font-display text-xl font-semibold tracking-tight">GIBCA DAM</span>
           </Link>
           <nav className="hidden md:flex items-center gap-1">
-            {isAdmin && (
-              <NavItem to="/dashboard" icon={<LayoutDashboard size={16} />}>Dashboard</NavItem>
-            )}
+            <NavItem to="/dashboard" icon={<LayoutDashboard size={16} />}>Dashboard</NavItem>
             <NavItem to="/projects" icon={<FolderKanban size={16} />}>Projects</NavItem>
             <NavItem to="/images" icon={<ImageIcon size={16} />}>Images</NavItem>
             <NavItem to="/library" icon={<Library size={16} />}>Library</NavItem>
