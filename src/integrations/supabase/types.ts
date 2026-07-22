@@ -154,6 +154,8 @@ export type Database = {
       }
       projects: {
         Row: {
+          accessories: string | null
+          brand: string | null
           contractor: string | null
           country: string | null
           created_at: string
@@ -165,10 +167,13 @@ export type Database = {
           project_no: string
           search_tsv: unknown
           sector: string | null
+          speciality: string | null
           tags: string[]
           updated_at: string
         }
         Insert: {
+          accessories?: string | null
+          brand?: string | null
           contractor?: string | null
           country?: string | null
           created_at?: string
@@ -180,10 +185,13 @@ export type Database = {
           project_no: string
           search_tsv?: unknown
           sector?: string | null
+          speciality?: string | null
           tags?: string[]
           updated_at?: string
         }
         Update: {
+          accessories?: string | null
+          brand?: string | null
           contractor?: string | null
           country?: string | null
           created_at?: string
@@ -195,6 +203,7 @@ export type Database = {
           project_no?: string
           search_tsv?: unknown
           sector?: string | null
+          speciality?: string | null
           tags?: string[]
           updated_at?: string
         }
