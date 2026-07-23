@@ -1,5 +1,7 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { ALL_FILTER_FIELDS, FilterFieldExt, getDistinct } from "@/lib/dam";
+import { listBrands } from "@/lib/settings";
+import { COUNTRIES } from "@/lib/countries";
 import { ChevronDown, X, Search } from "lucide-react";
 
 interface Props {
@@ -8,23 +10,33 @@ interface Props {
 }
 
 const LABELS: Record<FilterFieldExt, string> = {
-  sector: "Sector", country: "Country", product: "Product", finish: "Finish", contractor: "Contractor",
+  brand: "Brand", sector: "Sector", country: "Country", product: "Product", finish: "Finish", contractor: "Contractor",
 };
 
+const emptyMap = <T,>(v: T): Record<FilterFieldExt, T> => ({
+  brand: v, sector: v, country: v, product: v, finish: v, contractor: v,
+});
+
 export default function FilterPanel({ value, onChange }: Props) {
-  const [opts, setOpts] = useState<Record<FilterFieldExt, string[]>>({
-    sector: [], country: [], product: [], finish: [], contractor: [],
-  });
-  const [open, setOpen] = useState<Record<FilterFieldExt, boolean>>({
-    sector: true, country: true, product: false, finish: false, contractor: false,
-  });
-  const [q, setQ] = useState<Record<FilterFieldExt, string>>({
-    sector: "", country: "", product: "", finish: "", contractor: "",
-  });
+  const [opts, setOpts] = useState<Record<FilterFieldExt, string[]>>(() => emptyMap<string[]>([]));
+  const [open, setOpen] = useState<Record<FilterFieldExt, boolean>>(() => ({
+    ...emptyMap(false), brand: true, sector: true, country: true,
+  }));
+  const [q, setQ] = useState<Record<FilterFieldExt, string>>(() => emptyMap<string>(""));
 
   useEffect(() => {
-    Promise.all(ALL_FILTER_FIELDS.map((f) => getDistinct(f).then((v) => [f, v] as const)))
-      .then((entries) => setOpts(Object.fromEntries(entries) as any));
+    // Load brands and country list from canonical sources; other fields from distinct project values.
+    Promise.all([
+      listBrands().then((b) => ["brand", b.map((x) => x.name)] as const).catch(() => ["brand", []] as const),
+      Promise.resolve(["country", COUNTRIES] as const),
+      ...(["sector", "product", "finish", "contractor"] as FilterFieldExt[]).map((f) =>
+        getDistinct(f as any).then((v) => [f, v] as const)
+      ),
+    ]).then((entries) => {
+      const next = emptyMap<string[]>([]);
+      for (const [k, v] of entries) (next as any)[k] = v;
+      setOpts(next);
+    });
   }, []);
 
   const toggle = (f: FilterFieldExt, v: string) => {
