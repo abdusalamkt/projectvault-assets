@@ -13,10 +13,10 @@ export default function Login() {
 
   if (session) return <Navigate to={session.role === "admin" ? "/dashboard" : "/projects"} replace />;
 
-  const submit = (e: React.FormEvent) => {
+  const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErr(null);
-    const r = login(u, p);
+    const r = await login(u, p);
     if (!r.ok) { setErr(r.error ?? "Login failed"); return; }
     nav("/projects");
   };
