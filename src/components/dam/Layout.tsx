@@ -1,6 +1,6 @@
 import { Link, NavLink, Outlet, useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
-import { LogOut, LayoutDashboard, FolderKanban, Upload, Library, Image as ImageIcon } from "lucide-react";
+import { LogOut, LayoutDashboard, FolderKanban, Upload, Library, Image as ImageIcon, Settings as SettingsIcon } from "lucide-react";
 
 export default function Layout() {
   const { session, logout } = useAuth();
@@ -23,6 +23,7 @@ export default function Layout() {
             <NavItem to="/images" icon={<ImageIcon size={16} />}>Images</NavItem>
             <NavItem to="/library" icon={<Library size={16} />}>Library</NavItem>
             {isAdmin && <NavItem to="/import" icon={<Upload size={16} />}>Import</NavItem>}
+            {isAdmin && <NavItem to="/settings" icon={<SettingsIcon size={16} />}>Settings</NavItem>}
           </nav>
           <div className="flex items-center gap-3">
             <span className="hidden sm:inline text-xs uppercase tracking-wider text-muted-foreground">

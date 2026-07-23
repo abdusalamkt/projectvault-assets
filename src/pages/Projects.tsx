@@ -39,7 +39,9 @@ export default function Projects() {
   const [search, setSearch] = useState<string>(initial.search ?? "");
   const [debounced, setDebounced] = useState<string>(initial.search ?? "");
   const [chips, setChips] = useState<Chip[]>(initial.chips ?? []);
-  const [filters, setFilters] = useState<Partial<Record<FilterFieldExt, string[]>>>(initial.filters ?? {});
+  const [filters, setFilters] = useState<Partial<Record<FilterFieldExt, string[]>>>(
+    initial.filters ?? { brand: ["Hufcor"] }
+  );
   const [sort, setSort] = useState<SortKey>(initial.sort ?? "created_desc");
   const [page, setPage] = useState<number>(initial.page ?? 0);
   const [rows, setRows] = useState<ProjectRow[]>([]);

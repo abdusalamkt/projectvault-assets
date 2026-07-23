@@ -16,6 +16,7 @@ import Import from "./pages/Import";
 import Index from "./pages/Index";
 import Library from "./pages/Library";
 import Images from "./pages/Images";
+import Settings from "./pages/Settings";
 
 const queryClient = new QueryClient();
 
@@ -40,6 +41,7 @@ const App = () => (
               <Route path="/projects/new" element={<ProjectForm />} />
               <Route path="/projects/:id/edit" element={<ProjectForm />} />
               <Route path="/import" element={<Import />} />
+              <Route path="/settings" element={<Settings />} />
             </Route>
             <Route path="*" element={<NotFound />} />
           </Routes>

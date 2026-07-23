@@ -40,7 +40,7 @@ export interface ProjectImage {
 export const FILTER_FIELDS = ["sector", "country", "product", "finish"] as const;
 export type FilterField = (typeof FILTER_FIELDS)[number];
 
-export const ALL_FILTER_FIELDS = ["sector", "country", "product", "finish", "contractor"] as const;
+export const ALL_FILTER_FIELDS = ["brand", "sector", "country", "product", "finish", "contractor"] as const;
 export type FilterFieldExt = (typeof ALL_FILTER_FIELDS)[number];
 
 export type SortKey =

@@ -14,6 +14,54 @@ export type Database = {
   }
   public: {
     Tables: {
+      app_users: {
+        Row: {
+          created_at: string
+          id: string
+          password: string
+          role: string
+          updated_at: string
+          username: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          password: string
+          role?: string
+          updated_at?: string
+          username: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          password?: string
+          role?: string
+          updated_at?: string
+          username?: string
+        }
+        Relationships: []
+      }
+      brands: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          sort_order: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          sort_order?: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          sort_order?: number
+        }
+        Relationships: []
+      }
       library_files: {
         Row: {
           category: string | null
@@ -208,6 +256,38 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      taxonomy_values: {
+        Row: {
+          brand_id: string | null
+          created_at: string
+          field: string
+          id: string
+          value: string
+        }
+        Insert: {
+          brand_id?: string | null
+          created_at?: string
+          field: string
+          id?: string
+          value: string
+        }
+        Update: {
+          brand_id?: string | null
+          created_at?: string
+          field?: string
+          id?: string
+          value?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "taxonomy_values_brand_id_fkey"
+            columns: ["brand_id"]
+            isOneToOne: false
+            referencedRelation: "brands"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {

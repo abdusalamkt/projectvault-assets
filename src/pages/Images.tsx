@@ -24,7 +24,7 @@ export default function Images() {
   const [search, setSearch] = useState("");
   const [debounced, setDebounced] = useState("");
   const [chips, setChips] = useState<Chip[]>([]);
-  const [filters, setFilters] = useState<Partial<Record<FilterFieldExt, string[]>>>({});
+  const [filters, setFilters] = useState<Partial<Record<FilterFieldExt, string[]>>>({ brand: ["Hufcor"] });
   const [tagFilter, setTagFilter] = useState<string[]>([]);
   const [tagFilterInput, setTagFilterInput] = useState("");
   const [sort, setSort] = useState<"created_desc" | "created_asc">("created_desc");
