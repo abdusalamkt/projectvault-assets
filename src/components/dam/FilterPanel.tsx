@@ -10,11 +10,11 @@ interface Props {
 }
 
 const LABELS: Record<FilterFieldExt, string> = {
-  brand: "Brand", sector: "Sector", country: "Country", product: "Product", finish: "Finish", contractor: "Contractor",
+  brand: "Brand", sector: "Sector", country: "Country", product: "Product", finish: "Finish", contractor: "Contractor", speciality: "Speciality", accessories: "Accessories",
 };
 
 const emptyMap = <T,>(v: T): Record<FilterFieldExt, T> => ({
-  brand: v, sector: v, country: v, product: v, finish: v, contractor: v,
+  brand: v, sector: v, country: v, product: v, finish: v, contractor: v, speciality: v, accessories: v,
 });
 
 export default function FilterPanel({ value, onChange }: Props) {
@@ -29,7 +29,7 @@ export default function FilterPanel({ value, onChange }: Props) {
     Promise.all([
       listBrands().then((b) => ["brand", b.map((x) => x.name)] as const).catch(() => ["brand", []] as const),
       Promise.resolve(["country", COUNTRIES] as const),
-      ...(["sector", "product", "finish", "contractor"] as FilterFieldExt[]).map((f) =>
+      ...(["sector", "product", "finish", "contractor", "speciality", "accessories"] as FilterFieldExt[]).map((f) =>
         getDistinct(f as any).then((v) => [f, v] as const)
       ),
     ]).then((entries) => {
