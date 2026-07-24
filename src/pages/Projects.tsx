@@ -369,7 +369,7 @@ export default function Projects() {
                 <div className="flex items-center justify-center gap-2 mt-10">
                   <button
                     disabled={page === 0}
-                    onClick={() => setPage(page - 1)}
+                    onClick={() => { setPage(page - 1); window.scrollTo({ top: 0, behavior: "smooth" }); }}
                     className="px-4 py-2 border border-border rounded-sm text-sm disabled:opacity-40 hover:bg-secondary transition-smooth"
                   >Previous</button>
                   <span className="text-sm text-muted-foreground px-3">
@@ -377,7 +377,7 @@ export default function Projects() {
                   </span>
                   <button
                     disabled={page >= totalPages - 1}
-                    onClick={() => setPage(page + 1)}
+                    onClick={() => { setPage(page + 1); window.scrollTo({ top: 0, behavior: "smooth" }); }}
                     className="px-4 py-2 border border-border rounded-sm text-sm disabled:opacity-40 hover:bg-secondary transition-smooth"
                   >Next</button>
                 </div>
