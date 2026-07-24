@@ -4,7 +4,7 @@ import { stats } from "@/lib/dam";
 import { supabase } from "@/integrations/supabase/client";
 import {
   FolderKanban, Image as ImageIcon, Plus, Upload, Tag, Globe, Package,
-  Hammer, Layers, Sparkles, Building2, Search,
+  Hammer, Layers, Sparkles, Building2, Search, Palette,
 } from "lucide-react";
 import { motion } from "framer-motion";
 import { useAuth } from "@/context/AuthContext";
@@ -53,7 +53,7 @@ export default function Dashboard() {
     stats().then(setS).catch(() => {});
     supabase
       .from("projects")
-      .select("brand, product, country, sector, contractor, tags")
+      .select("brand, product, country, sector, contractor, finish, tags")
       .limit(5000)
       .then(({ data }) => setRows(data ?? []));
     supabase
@@ -91,6 +91,7 @@ export default function Dashboard() {
       countries: collect("country"),
       sectors: collect("sector"),
       contractors: collect("contractor"),
+      finishes: collect("finish"),
       tags: Array.from(tagMap.entries()).sort((a, b) => b[1] - a[1]),
     };
   }, [rows]);
@@ -136,6 +137,10 @@ export default function Dashboard() {
         <ChipSection
           title="Contractors" icon={<Hammer size={16} />}
           items={groups.contractors} type="Contractor" onPick={(c) => jumpToProjects(nav, c)}
+        />
+        <ChipSection
+          title="Finishes" icon={<Palette size={16} />}
+          items={groups.finishes} type="Finish" onPick={(c) => jumpToProjects(nav, c)}
         />
         <ChipSection
           title="Project Tags" icon={<Tag size={16} />}
