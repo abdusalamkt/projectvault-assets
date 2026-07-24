@@ -123,9 +123,17 @@ function UserRow({ user, onChanged }: { user: AppUser; onChanged: () => void }) 
   };
 
   const del = async () => {
-    if (!confirm(`Delete user "${user.username}"?`)) return;
-    try { await deleteUser(user.id); toast.success("Deleted"); onChanged(); }
-    catch (e: any) { toast.error(e.message); }
+    toast(`Delete user "${user.username}"?`, {
+      action: {
+        label: "Delete",
+        onClick: async () => {
+          try { await deleteUser(user.id); toast.success("Deleted"); onChanged(); }
+          catch (e: any) { toast.error(e.message); }
+        },
+      },
+      cancel: { label: "Cancel", onClick: () => {} },
+      duration: 6000,
+    });
   };
 
   return (
