@@ -44,11 +44,37 @@ export default function ProjectDetail() {
     finally { setUploading(false); }
   };
 
-  const onDelete = async () => {
-    if (!project || !confirm(`Delete project "${project.project_name}"? This removes all its images.`)) return;
-    await deleteProject(project.id);
-    toast.success("Project deleted");
-    nav("/projects");
+  const onDelete = () => {
+    if (!project) return;
+    toast(`Delete project "${project.project_name}"?`, {
+      description: "This removes the project and all its images. This cannot be undone.",
+      action: {
+        label: "Delete",
+        onClick: async () => {
+          try {
+            await deleteProject(project.id);
+            toast.success("Project deleted");
+            nav("/projects");
+          } catch (e: any) { toast.error(e.message ?? "Delete failed"); }
+        },
+      },
+      cancel: { label: "Cancel", onClick: () => {} },
+      duration: 8000,
+    });
+  };
+
+  const confirmDeleteImage = (img: ProjectImage) => {
+    toast("Delete this image?", {
+      action: {
+        label: "Delete",
+        onClick: async () => {
+          try { await deleteImage(img); toast.success("Image deleted"); load(); }
+          catch (e: any) { toast.error(e.message ?? "Delete failed"); }
+        },
+      },
+      cancel: { label: "Cancel", onClick: () => {} },
+      duration: 6000,
+    });
   };
 
   const downloadAll = async () => {
@@ -176,7 +202,7 @@ export default function ProjectDetail() {
                     <span
                       onClick={async (e) => {
                         e.stopPropagation();
-                        if (confirm("Delete this image?")) { await deleteImage(img); load(); }
+                        confirmDeleteImage(img);
                       }}
                       className="absolute top-2 right-2 p-1.5 bg-destructive text-destructive-foreground rounded-sm opacity-0 group-hover:opacity-100 transition-smooth"
                     ><Trash2 size={12} /></span>

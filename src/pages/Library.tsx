@@ -116,10 +116,19 @@ export default function Library() {
     } catch (e: any) { toast.error(e.message); }
   };
 
-  const handleDeleteFolder = async (f: LibraryFolder) => {
-    if (!confirm(`Delete folder "${f.name}" and all its contents?`)) return;
-    try { await deleteFolder(f.id); toast.success("Deleted"); refresh(); }
-    catch (e: any) { toast.error(e.message); }
+  const handleDeleteFolder = (f: LibraryFolder) => {
+    toast(`Delete folder "${f.name}"?`, {
+      description: "This removes the folder and all its contents.",
+      action: {
+        label: "Delete",
+        onClick: async () => {
+          try { await deleteFolder(f.id); toast.success("Deleted"); refresh(); }
+          catch (e: any) { toast.error(e.message); }
+        },
+      },
+      cancel: { label: "Cancel", onClick: () => {} },
+      duration: 6000,
+    });
   };
 
   const handleRenameFolder = async (f: LibraryFolder) => {
@@ -129,10 +138,18 @@ export default function Library() {
     catch (e: any) { toast.error(e.message); }
   };
 
-  const handleDeleteFile = async (f: LibraryFile) => {
-    if (!confirm(`Delete "${f.name}"?`)) return;
-    try { await deleteFile(f); toast.success("Deleted"); refresh(); }
-    catch (e: any) { toast.error(e.message); }
+  const handleDeleteFile = (f: LibraryFile) => {
+    toast(`Delete "${f.name}"?`, {
+      action: {
+        label: "Delete",
+        onClick: async () => {
+          try { await deleteFile(f); toast.success("Deleted"); refresh(); }
+          catch (e: any) { toast.error(e.message); }
+        },
+      },
+      cancel: { label: "Cancel", onClick: () => {} },
+      duration: 6000,
+    });
   };
 
   const handleDownloadFolder = async (f: LibraryFolder) => {

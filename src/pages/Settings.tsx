@@ -123,9 +123,17 @@ function UserRow({ user, onChanged }: { user: AppUser; onChanged: () => void }) 
   };
 
   const del = async () => {
-    if (!confirm(`Delete user "${user.username}"?`)) return;
-    try { await deleteUser(user.id); toast.success("Deleted"); onChanged(); }
-    catch (e: any) { toast.error(e.message); }
+    toast(`Delete user "${user.username}"?`, {
+      action: {
+        label: "Delete",
+        onClick: async () => {
+          try { await deleteUser(user.id); toast.success("Deleted"); onChanged(); }
+          catch (e: any) { toast.error(e.message); }
+        },
+      },
+      cancel: { label: "Cancel", onClick: () => {} },
+      duration: 6000,
+    });
   };
 
   return (
@@ -232,10 +240,19 @@ function BrandRow({ brand, active, onSelect, onChanged }: { brand: Brand; active
     try { await renameBrand(brand.id, name); setEdit(false); onChanged(); }
     catch (e: any) { toast.error(e.message); }
   };
-  const del = async () => {
-    if (!confirm(`Delete brand "${brand.name}" and all its taxonomy values?`)) return;
-    try { await deleteBrand(brand.id); onChanged(); toast.success("Deleted"); }
-    catch (e: any) { toast.error(e.message); }
+  const del = () => {
+    toast(`Delete brand "${brand.name}"?`, {
+      description: "This removes the brand and all its taxonomy values.",
+      action: {
+        label: "Delete",
+        onClick: async () => {
+          try { await deleteBrand(brand.id); onChanged(); toast.success("Deleted"); }
+          catch (e: any) { toast.error(e.message); }
+        },
+      },
+      cancel: { label: "Cancel", onClick: () => {} },
+      duration: 6000,
+    });
   };
   return (
     <div className={`group flex items-center gap-1 rounded-sm px-2 py-1.5 transition-smooth ${active ? "bg-secondary" : "hover:bg-secondary/50"}`}>
