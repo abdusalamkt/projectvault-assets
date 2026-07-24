@@ -18,7 +18,28 @@ async function urlToDataURL(url: string): Promise<{ data: string; fmt: "PNG" | "
       r.onerror = rej;
       r.readAsDataURL(blob);
     });
-    return { data, fmt: data.startsWith("data:image/png") ? "PNG" : "JPEG" };
+    // jsPDF only supports PNG/JPEG. Re-encode webp/avif/etc. via canvas to PNG.
+    const isPng = data.startsWith("data:image/png");
+    const isJpg = data.startsWith("data:image/jpeg") || data.startsWith("data:image/jpg");
+    if (isPng) return { data, fmt: "PNG" };
+    if (isJpg) return { data, fmt: "JPEG" };
+    const png = await new Promise<string | null>((resolve) => {
+      const img = new Image();
+      img.crossOrigin = "anonymous";
+      img.onload = () => {
+        try {
+          const c = document.createElement("canvas");
+          c.width = img.naturalWidth; c.height = img.naturalHeight;
+          const ctx = c.getContext("2d");
+          if (!ctx) return resolve(null);
+          ctx.drawImage(img, 0, 0);
+          resolve(c.toDataURL("image/png"));
+        } catch { resolve(null); }
+      };
+      img.onerror = () => resolve(null);
+      img.src = data;
+    });
+    return png ? { data: png, fmt: "PNG" } : null;
   } catch {
     return null;
   }
