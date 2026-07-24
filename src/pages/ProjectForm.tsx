@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { getProject, ProjectRow, upsertProject } from "@/lib/dam";
+import { getProject, getProjectByNo, ProjectRow, upsertProject, uploadImage } from "@/lib/dam";
 import { listBrands, listTaxonomy, Brand, BrandField, BRAND_FIELDS } from "@/lib/settings";
 import { COUNTRIES } from "@/lib/countries";
 import SearchableSelect from "@/components/dam/SearchableSelect";
-import { ArrowLeft, Save, Loader2 } from "lucide-react";
+import DropZone from "@/components/dam/DropZone";
+import { ArrowLeft, Save, Loader2, X, Image as ImageIcon } from "lucide-react";
 import { toast } from "sonner";
 
 const FIELD_LABELS: Record<BrandField, string> = {
@@ -23,6 +24,8 @@ export default function ProjectForm() {
     sector: [], product: [], finish: [], contractor: [], speciality: [], accessories: [],
   });
   const [taxLoading, setTaxLoading] = useState(false);
+  const [pendingImages, setPendingImages] = useState<File[]>([]);
+  const [uploadProgress, setUploadProgress] = useState<{ done: number; total: number } | null>(null);
 
   useEffect(() => {
     listBrands().then(setBrands).catch((e) => toast.error(e.message));
@@ -57,11 +60,28 @@ export default function ProjectForm() {
     }
     setBusy(true);
     try {
+      const trimmedNo = form.project_no!.trim();
+      // Enforce unique project_no on create (and on edit when the number changed).
+      const existingId = await getProjectByNo(trimmedNo);
+      if (existingId && existingId !== id) {
+        toast.error(`Project No "${trimmedNo}" already exists`);
+        setBusy(false);
+        return;
+      }
       const saved = await upsertProject({
         ...(form as any),
-        project_no: form.project_no!.trim(),
+        project_no: trimmedNo,
         project_name: form.project_name!.trim(),
       });
+      if (pendingImages.length) {
+        setUploadProgress({ done: 0, total: pendingImages.length });
+        for (let i = 0; i < pendingImages.length; i++) {
+          try { await uploadImage(saved.id, pendingImages[i]); }
+          catch (err: any) { toast.error(`Failed to upload ${pendingImages[i].name}: ${err.message}`); }
+          setUploadProgress({ done: i + 1, total: pendingImages.length });
+        }
+        setUploadProgress(null);
+      }
       toast.success(editing ? "Project updated" : "Project created");
       nav(`/projects/${saved.id}`);
     } catch (e: any) { toast.error(e.message); }
@@ -131,6 +151,38 @@ export default function ProjectForm() {
             onChange={(e) => setForm({ ...form, description: e.target.value })}
             className="w-full bg-background border border-border rounded-sm px-3 py-2 focus:outline-none focus:border-gold transition-smooth" />
         </div>
+
+        {!editing && (
+          <div>
+            <label className="block text-xs uppercase tracking-widest text-muted-foreground mb-2">
+              Images <span className="text-muted-foreground/70 normal-case tracking-normal">(optional — upload as draft)</span>
+            </label>
+            <DropZone
+              onFiles={(files) => {
+                const imgs = files.filter((f) => f.type.startsWith("image/"));
+                if (imgs.length !== files.length) toast.message("Non-image files were skipped");
+                setPendingImages((prev) => [...prev, ...imgs]);
+              }}
+              hint="Drop images here, or click to browse. They'll upload after the project is created."
+            />
+            {pendingImages.length > 0 && (
+              <div className="mt-3 space-y-1.5">
+                {pendingImages.map((f, i) => (
+                  <div key={`${f.name}:${i}`} className="flex items-center gap-2 text-xs bg-secondary rounded-sm px-2 py-1.5">
+                    <ImageIcon size={12} className="text-gold shrink-0" />
+                    <span className="truncate flex-1">{f.name}</span>
+                    <span className="text-muted-foreground">{(f.size / 1024).toFixed(0)} KB</span>
+                    <button type="button" onClick={() => setPendingImages((prev) => prev.filter((_, idx) => idx !== i))}
+                      className="hover:text-destructive p-0.5"><X size={12} /></button>
+                  </div>
+                ))}
+                {uploadProgress && (
+                  <p className="text-xs text-muted-foreground">Uploading {uploadProgress.done}/{uploadProgress.total}…</p>
+                )}
+              </div>
+            )}
+          </div>
+        )}
 
         <button type="submit" disabled={busy}
           className="inline-flex items-center gap-2 bg-primary text-primary-foreground px-5 py-2.5 rounded-sm hover:bg-primary/90 transition-smooth disabled:opacity-50">
