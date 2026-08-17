@@ -207,18 +207,14 @@ async function drawBanner(doc: jsPDF, project: ProjectRow, theme: BrandTheme, ba
     if (img) {
       const f = fitCover(img.w, img.h, PAGE_W, BANNER_H);
       // clip to banner box
-      // @ts-expect-error jsPDF advanced API
-      doc.saveGraphicsState?.();
+      doc.saveGraphicsState();
       doc.rect(0, 0, PAGE_W, BANNER_H);
-      // @ts-expect-error jsPDF advanced API
-      doc.clip?.();
-      // @ts-expect-error jsPDF advanced API
-      doc.discardPath?.();
+      doc.clip();
+      doc.discardPath();
       try {
         doc.addImage(img.data, img.fmt, f.x, f.y, f.w, f.h, undefined, "FAST");
       } catch { /* ignore */ }
-      // @ts-expect-error jsPDF advanced API
-      doc.restoreGraphicsState?.();
+      doc.restoreGraphicsState();
     }
   }
 
@@ -368,18 +364,14 @@ async function drawGallery(doc: jsPDF, project: ProjectRow, images: ProjectImage
     doc.rect(padH, y, boxW, imgH, "F");
     if (img) {
       const f = fitCover(img.w, img.h, boxW, imgH);
-      // @ts-expect-error jsPDF advanced API
-      doc.saveGraphicsState?.();
+      doc.saveGraphicsState();
       doc.rect(padH, y, boxW, imgH);
-      // @ts-expect-error jsPDF advanced API
-      doc.clip?.();
-      // @ts-expect-error jsPDF advanced API
-      doc.discardPath?.();
+      doc.clip();
+      doc.discardPath();
       try {
         doc.addImage(img.data, img.fmt, padH + f.x, y + f.y, f.w, f.h, undefined, "FAST");
       } catch { /* ignore */ }
-      // @ts-expect-error jsPDF advanced API
-      doc.restoreGraphicsState?.();
+      doc.restoreGraphicsState();
     } else {
       doc.setFont("helvetica", "normal");
       doc.setFontSize(8);
