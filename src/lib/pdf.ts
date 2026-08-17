@@ -199,16 +199,16 @@ async function coverImage(url: string): Promise<{ data: string; fmt: "PNG" | "JP
 
 /* ── banner ────────────────────────────────────────────────── */
 async function drawBanner(doc: jsPDF, project: ProjectRow, theme: BrandTheme, bannerUrl?: string) {
-  // hero image (or dark fallback)
+  const barY = BANNER_H - BAR_H;
+  // hero image sits ABOVE the colour bar and stops exactly at its top edge
   doc.setFillColor(24, 24, 24);
-  doc.rect(0, 0, PAGE_W, BANNER_H, "F");
+  doc.rect(0, 0, PAGE_W, barY, "F");
   if (bannerUrl) {
     const img = await coverImage(bannerUrl);
     if (img) {
-      const f = fitCover(img.w, img.h, PAGE_W, BANNER_H);
-      // clip to banner box
+      const f = fitCover(img.w, img.h, PAGE_W, barY);
       doc.saveGraphicsState();
-      doc.rect(0, 0, PAGE_W, BANNER_H);
+      doc.rect(0, 0, PAGE_W, barY);
       doc.clip();
       doc.discardPath();
       try {
@@ -217,8 +217,10 @@ async function drawBanner(doc: jsPDF, project: ProjectRow, theme: BrandTheme, ba
       doc.restoreGraphicsState();
     }
   }
+  // thin hairline separating the image from the colour bar
+  doc.setFillColor(255, 255, 255);
+  doc.rect(0, barY - 0.6, PAGE_W, 0.6, "F");
 
-  const barY = BANNER_H - BAR_H;
   // product gradient bar (full width, dark → accent left→right)
   gradientRect(doc, 0, barY, PAGE_W, BAR_H, theme.productFrom, theme.productTo);
 
@@ -261,10 +263,10 @@ async function drawBanner(doc: jsPDF, project: ProjectRow, theme: BrandTheme, ba
   doc.setFontSize(6.5);
   const rw = doc.getTextWidth(ribbon) + 22;
   doc.setFillColor(37, 37, 37);
-  doc.rect(0, barY - 6.5, rw - 5, 6.5, "F");
-  doc.triangle(rw - 5, barY - 6.5, rw, barY - 6.5, rw - 5, barY, "F");
+  doc.rect(0, barY - 7.1, rw - 5, 6.5, "F");
+  doc.triangle(rw - 5, barY - 7.1, rw, barY - 7.1, rw - 5, barY - 0.6, "F");
   doc.setTextColor(255, 255, 255);
-  doc.text(ribbon, 6, barY - 2);
+  doc.text(ribbon, 6, barY - 2.6);
 
   // REFERENCE LIST tab (right aligned, angled left edge)
   const tabW = 42, tabH = 7, tabX = PAGE_W - tabW, tabY = BANNER_H;
