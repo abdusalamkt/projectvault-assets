@@ -2,12 +2,98 @@ import jsPDF from "jspdf";
 import { ProjectRow, ProjectImage } from "@/lib/dam";
 import { fetchAsBlob } from "@/lib/download";
 
-const GREEN_DARK: [number, number, number] = [20, 82, 20];
-const GREEN: [number, number, number] = [46, 125, 50];
-const BG_SOFT: [number, number, number] = [249, 251, 247];
-const TAG_BG: [number, number, number] = [242, 245, 240];
-const TEXT: [number, number, number] = [30, 42, 28];
-const MUTED: [number, number, number] = [90, 110, 86];
+/* ─────────────────────────────────────────────────────────────
+   GIBCA reference-list PDF — A4 portrait (210 × 297 mm)
+   Layout mirrors the web PdfGen template:
+   hero banner + angled sector block + product gradient bar,
+   "REFERENCE LIST" tab, accent-ruled content rows, logo footer,
+   then 2-up gallery pages with captions + tag chips.
+   ───────────────────────────────────────────────────────────── */
+
+type RGB = [number, number, number];
+
+interface BrandTheme {
+  name: string;
+  accent: RGB;
+  sectorFrom: RGB; // left dark block gradient
+  sectorTo: RGB;
+  productFrom: RGB; // bottom bar gradient (left → right)
+  productTo: RGB;
+  productLabel: string;
+  productSubLabel: string;
+}
+
+const HUFCOR: BrandTheme = {
+  name: "HUFCOR",
+  accent: [215, 32, 39],
+  sectorFrom: [36, 36, 36],
+  sectorTo: [61, 61, 61],
+  productFrom: [142, 18, 23],
+  productTo: [215, 32, 39],
+  productLabel: "OPERABLE WALLS AND GLASSWALLS",
+  productSubLabel:
+    "600 SERIES | 7000 SERIES | WEATHER RESISTANT GLASSWALLS | ACOUSTIC GLASSWALLS | FRAMELESS GLASSWALL",
+};
+
+const THEMES: { match: RegExp; theme: BrandTheme }[] = [
+  { match: /hufcor/i, theme: HUFCOR },
+  {
+    match: /hpl/i,
+    theme: {
+      name: "HPL",
+      accent: [26, 122, 26],
+      sectorFrom: [26, 46, 26],
+      sectorTo: [45, 77, 45],
+      productFrom: [20, 82, 20],
+      productTo: [46, 125, 50],
+      productLabel: "COMPACT LAMINATE SOLUTIONS",
+      productSubLabel:
+        "WASHROOM CUBICLES | LOCKER SYSTEMS | WALL CLADDING | INTEGRATED PANEL SYSTEM",
+    },
+  },
+  {
+    match: /auralis/i,
+    theme: {
+      name: "AURALIS",
+      accent: [64, 64, 65],
+      sectorFrom: [26, 26, 26],
+      sectorTo: [64, 64, 65],
+      productFrom: [64, 64, 65],
+      productTo: [90, 91, 92],
+      productLabel: "ACOUSTIC SOLUTIONS",
+      productSubLabel: "ACOUSTIC PANELS | BAFFLES | WALL SYSTEMS",
+    },
+  },
+  {
+    match: /office/i,
+    theme: {
+      name: "OFFICE PARTITIONS",
+      accent: [64, 64, 65],
+      sectorFrom: [26, 46, 26],
+      sectorTo: [64, 64, 65],
+      productFrom: [64, 64, 65],
+      productTo: [90, 91, 92],
+      productLabel: "OFFICE PARTITION SYSTEMS",
+      productSubLabel: "SINGLE GLAZED | DOUBLE GLAZED",
+    },
+  },
+];
+
+function themeFor(brand?: string | null): BrandTheme {
+  const b = brand ?? "";
+  return THEMES.find((t) => t.match.test(b))?.theme ?? HUFCOR;
+}
+
+const INK: RGB = [31, 31, 31];
+const MUTED: RGB = [130, 130, 130];
+
+/* ── geometry (mm) ─────────────────────────────────────────── */
+const PAGE_W = 210;
+const PAGE_H = 297;
+const BANNER_H = 116; // 440px
+const BAR_H = 29; // 110px
+const SECTOR_W = 63; // 240px
+const MARGIN = 14;
 
 async function urlToDataURL(url: string): Promise<{ data: string; fmt: "PNG" | "JPEG" } | null> {
   try {
@@ -18,23 +104,24 @@ async function urlToDataURL(url: string): Promise<{ data: string; fmt: "PNG" | "
       r.onerror = rej;
       r.readAsDataURL(blob);
     });
-    // jsPDF only supports PNG/JPEG. Re-encode webp/avif/etc. via canvas to PNG.
-    const isPng = data.startsWith("data:image/png");
-    const isJpg = data.startsWith("data:image/jpeg") || data.startsWith("data:image/jpg");
-    if (isPng) return { data, fmt: "PNG" };
-    if (isJpg) return { data, fmt: "JPEG" };
+    if (data.startsWith("data:image/png")) return { data, fmt: "PNG" };
+    if (data.startsWith("data:image/jpeg") || data.startsWith("data:image/jpg"))
+      return { data, fmt: "JPEG" };
     const png = await new Promise<string | null>((resolve) => {
       const img = new Image();
       img.crossOrigin = "anonymous";
       img.onload = () => {
         try {
           const c = document.createElement("canvas");
-          c.width = img.naturalWidth; c.height = img.naturalHeight;
+          c.width = img.naturalWidth;
+          c.height = img.naturalHeight;
           const ctx = c.getContext("2d");
           if (!ctx) return resolve(null);
           ctx.drawImage(img, 0, 0);
           resolve(c.toDataURL("image/png"));
-        } catch { resolve(null); }
+        } catch {
+          resolve(null);
+        }
       };
       img.onerror = () => resolve(null);
       img.src = data;
@@ -45,114 +132,276 @@ async function urlToDataURL(url: string): Promise<{ data: string; fmt: "PNG" | "
   }
 }
 
-function drawHeader(doc: jsPDF, project: ProjectRow, pageW: number) {
-  // Gradient simulation: 60 thin slices left->right between two greens.
-  const headerH = 56;
-  const slices = 60;
+/** Horizontal gradient rectangle drawn as thin slices. */
+function gradientRect(
+  doc: jsPDF,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  from: RGB,
+  to: RGB,
+  slices = 80,
+) {
   for (let i = 0; i < slices; i++) {
     const t = i / (slices - 1);
-    const r = Math.round(GREEN[0] * (1 - t) + GREEN_DARK[0] * t);
-    const g = Math.round(GREEN[1] * (1 - t) + GREEN_DARK[1] * t);
-    const b = Math.round(GREEN[2] * (1 - t) + GREEN_DARK[2] * t);
-    doc.setFillColor(r, g, b);
-    doc.rect((pageW * i) / slices, 0, pageW / slices + 0.5, headerH, "F");
+    doc.setFillColor(
+      Math.round(from[0] * (1 - t) + to[0] * t),
+      Math.round(from[1] * (1 - t) + to[1] * t),
+      Math.round(from[2] * (1 - t) + to[2] * t),
+    );
+    doc.rect(x + (w * i) / slices, y, w / slices + 0.4, h, "F");
   }
+}
+
+/** Angled block: full rect up to `cut`, then a right-leaning wedge. */
+function angledBlock(
+  doc: jsPDF,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  from: RGB,
+  to: RGB,
+  slantRatio = 0.2,
+) {
+  const slant = w * slantRatio;
+  gradientRect(doc, x, y, w - slant, h, from, to);
+  // wedge: triangle (top-right of straight part) → sloping edge
+  doc.setFillColor(...to);
+  doc.triangle(x + w - slant, y, x + w, y, x + w - slant, y + h, "F");
+}
+
+function fitCover(
+  imgW: number,
+  imgH: number,
+  boxW: number,
+  boxH: number,
+): { w: number; h: number; x: number; y: number } {
+  const scale = Math.max(boxW / imgW, boxH / imgH);
+  const w = imgW * scale;
+  const h = imgH * scale;
+  return { w, h, x: (boxW - w) / 2, y: (boxH - h) / 2 };
+}
+
+async function coverImage(url: string): Promise<{ data: string; fmt: "PNG" | "JPEG"; w: number; h: number } | null> {
+  const loaded = await urlToDataURL(url);
+  if (!loaded) return null;
+  const dims = await new Promise<{ w: number; h: number } | null>((resolve) => {
+    const im = new Image();
+    im.onload = () => resolve({ w: im.naturalWidth, h: im.naturalHeight });
+    im.onerror = () => resolve(null);
+    im.src = loaded.data;
+  });
+  if (!dims) return null;
+  return { ...loaded, ...dims };
+}
+
+/* ── banner ────────────────────────────────────────────────── */
+async function drawBanner(doc: jsPDF, project: ProjectRow, theme: BrandTheme, bannerUrl?: string) {
+  // hero image (or dark fallback)
+  doc.setFillColor(24, 24, 24);
+  doc.rect(0, 0, PAGE_W, BANNER_H, "F");
+  if (bannerUrl) {
+    const img = await coverImage(bannerUrl);
+    if (img) {
+      const f = fitCover(img.w, img.h, PAGE_W, BANNER_H);
+      // clip to banner box
+      doc.saveGraphicsState();
+      doc.rect(0, 0, PAGE_W, BANNER_H);
+      doc.clip();
+      doc.discardPath();
+      try {
+        doc.addImage(img.data, img.fmt, f.x, f.y, f.w, f.h, undefined, "FAST");
+      } catch { /* ignore */ }
+      doc.restoreGraphicsState();
+    }
+  }
+
+  const barY = BANNER_H - BAR_H;
+  // product gradient bar (full width, dark → accent left→right)
+  gradientRect(doc, 0, barY, PAGE_W, BAR_H, theme.productFrom, theme.productTo);
+
+  // product label + sub label (right of the sector block)
+  const tx = SECTOR_W + 4;
   doc.setTextColor(255, 255, 255);
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(26);
-  const title = (project.project_name || "").toUpperCase();
-  const wrapped = doc.splitTextToSize(title, pageW - 28);
-  doc.text(wrapped.slice(0, 2), 14, 22);
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(11);
-  const subtitle = [project.sector, project.country].filter(Boolean).join(" · ") || "Project";
-  doc.text(subtitle, 14, headerH - 18);
-  // pill
-  const pill = `№ ${project.project_no}`;
-  doc.setFontSize(10);
-  const pillW = doc.getTextWidth(pill) + 10;
-  doc.setFillColor(255, 255, 255);
-  doc.setDrawColor(255, 255, 255);
-  doc.roundedRect(pageW - 14 - pillW, headerH - 24, pillW, 9, 4.5, 4.5, "S");
-  doc.text(pill, pageW - 14 - pillW + 5, headerH - 18);
-  return headerH;
-}
-
-function drawTags(doc: jsPDF, tags: string[], x: number, y: number, maxW: number) {
-  if (!tags.length) return y;
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(9);
-  let cx = x, cy = y;
-  const padX = 5, padY = 2.4, gap = 4, h = 7;
-  for (const t of tags) {
-    const w = doc.getTextWidth(t) + padX * 2;
-    if (cx + w > x + maxW) { cx = x; cy += h + gap; }
-    doc.setFillColor(...TAG_BG);
-    doc.setDrawColor(...TAG_BG);
-    doc.roundedRect(cx, cy, w, h, 3.5, 3.5, "F");
-    doc.setTextColor(...GREEN_DARK);
-    doc.text(t, cx + padX, cy + h - padY);
-    cx += w + gap;
-  }
-  return cy + h + 4;
-}
-
-function drawDetailRow(doc: jsPDF, label: string, value: string, x: number, y: number, w: number) {
-  doc.setDrawColor(...GREEN);
-  doc.setLineWidth(1.2);
-  doc.line(x, y - 4, x, y + 3);
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(10);
-  doc.setTextColor(...GREEN_DARK);
-  doc.text(`${label}:`, x + 4, y + 1);
-  doc.setFont("helvetica", "normal");
-  doc.setTextColor(...TEXT);
-  const labelW = 32;
-  const wrapped = doc.splitTextToSize(value || "—", w - labelW - 6);
-  doc.text(wrapped, x + 4 + labelW, y + 1);
-  return y + Math.max(7, wrapped.length * 5 + 2);
-}
-
-function drawDescription(doc: jsPDF, text: string, x: number, y: number, w: number) {
-  if (!text) return y;
-  doc.setFillColor(...BG_SOFT);
-  doc.setDrawColor(224, 233, 219);
-  const wrapped = doc.splitTextToSize(text, w - 12);
-  const h = wrapped.length * 5 + 16;
-  doc.roundedRect(x, y, w, h, 6, 6, "FD");
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(11);
-  doc.setTextColor(...GREEN_DARK);
-  doc.text("Description", x + 6, y + 7);
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(10);
-  doc.setTextColor(...TEXT);
-  doc.text(wrapped, x + 6, y + 13);
-  return y + h + 6;
-}
-
-function drawGalleryHeading(doc: jsPDF, x: number, y: number, label = "IMAGE GALLERY") {
-  doc.setDrawColor(...GREEN);
-  doc.setLineWidth(1.6);
-  doc.line(x, y - 5, x, y + 3);
-  doc.setFont("helvetica", "bold");
   doc.setFontSize(15);
-  doc.setTextColor(...GREEN_DARK);
-  doc.text(label, x + 5, y + 1);
-  return y + 8;
+  const labelLines = doc.splitTextToSize(theme.productLabel, PAGE_W - tx - 8).slice(0, 2);
+  doc.text(labelLines, tx, barY + 10);
+  doc.setDrawColor(255, 255, 255);
+  doc.setLineWidth(0.2);
+  const ruleY = barY + BAR_H - 9;
+  doc.line(tx, ruleY, PAGE_W - 8, ruleY);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(5.6);
+  doc.text(doc.splitTextToSize(theme.productSubLabel, PAGE_W - tx - 8)[0], tx, ruleY + 3.6);
+
+  // angled sector block
+  angledBlock(doc, 0, barY, SECTOR_W, BAR_H, theme.sectorFrom, theme.sectorTo);
+  const words = (project.sector || project.project_name || "").toUpperCase().split(" ");
+  const mid = Math.ceil(words.length / 2);
+  const l1 = words.slice(0, mid).join(" ");
+  const l2 = words.slice(mid).join(" ");
+  doc.setTextColor(255, 255, 255);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(11);
+  const sLines = [l1, l2].filter(Boolean);
+  let sy = barY + (sLines.length > 1 ? 9 : 12);
+  for (const ln of sLines) {
+    doc.text(doc.splitTextToSize(ln, SECTOR_W - 18)[0], 6, sy);
+    sy += 5;
+  }
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(6.5);
+  doc.text("SECTOR", 6, barY + BAR_H - 5.5);
+
+  // search / project-no ribbon above the bar
+  const ribbon = `№ ${project.project_no}`;
+  doc.setFontSize(6.5);
+  const rw = doc.getTextWidth(ribbon) + 22;
+  doc.setFillColor(37, 37, 37);
+  doc.rect(0, barY - 6.5, rw - 5, 6.5, "F");
+  doc.triangle(rw - 5, barY - 6.5, rw, barY - 6.5, rw - 5, barY, "F");
+  doc.setTextColor(255, 255, 255);
+  doc.text(ribbon, 6, barY - 2);
+
+  // REFERENCE LIST tab (right aligned, angled left edge)
+  const tabW = 42, tabH = 7, tabX = PAGE_W - tabW, tabY = BANNER_H;
+  doc.setFillColor(...theme.productTo);
+  doc.rect(tabX + 4, tabY, tabW - 4, tabH, "F");
+  doc.triangle(tabX + 4, tabY, tabX + 4, tabY + tabH, tabX, tabY + tabH, "F");
+  doc.setTextColor(255, 255, 255);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(7);
+  doc.text("REFERENCE LIST", tabX + tabW / 2 + 2, tabY + 4.8, { align: "center" });
+
+  return tabY + tabH;
 }
 
-function drawFooter(doc: jsPDF, text: string, pageW: number, pageH: number) {
+/* ── content rows: left accent label, rule, right values ───── */
+function drawRow(
+  doc: jsPDF,
+  theme: BrandTheme,
+  label: string,
+  values: string[],
+  y: number,
+): number {
+  const labelX = MARGIN;
+  const labelW = 39;
+  const ruleX = labelX + labelW;
+  const textX = ruleX + 5;
+  const textW = PAGE_W - MARGIN - textX;
+
+  const lines: string[] = [];
+  for (const v of values) lines.push(...doc.splitTextToSize(v, textW));
+  const lineH = 5.3;
+  const blockH = Math.max(lines.length * lineH, 7);
+
+  doc.setFillColor(...theme.accent);
+  doc.rect(ruleX, y - 4, 0.6, blockH + 1, "F");
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(11);
+  doc.setTextColor(...theme.accent);
+  const labelLines = doc.splitTextToSize(label.toUpperCase(), labelW - 6);
+  doc.text(labelLines, ruleX - 6, y + (blockH - labelLines.length * 4.6) / 2 - 0.5, {
+    align: "right",
+  });
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(9.5);
+  doc.setTextColor(...INK);
+  let ly = y;
+  for (const ln of lines) {
+    doc.text(ln, textX, ly);
+    ly += lineH;
+  }
+  return y + blockH + 9; // REGION_GAP
+}
+
+function drawPageFooter(doc: jsPDF, theme: BrandTheme) {
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(13);
+  doc.setTextColor(...INK);
+  doc.text("GIBCA", MARGIN, PAGE_H - 12);
   doc.setFont("helvetica", "normal");
   doc.setFontSize(8);
-  doc.setTextColor(...MUTED);
-  doc.text(text, pageW / 2, pageH - 8, { align: "center" });
+  doc.setTextColor(...theme.accent);
+  doc.text(theme.name, PAGE_W - MARGIN, PAGE_H - 12, { align: "right" });
 }
 
-/**
- * Build a styled PDF for one project. Appends pages to an existing doc when provided.
- * Returns the doc.
- */
+function tagChip(doc: jsPDF, label: string, color: RGB, x: number, y: number): number {
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(6);
+  const w = doc.getTextWidth(label.toUpperCase()) + 4;
+  doc.setFillColor(color[0], color[1], color[2]);
+  doc.setDrawColor(color[0], color[1], color[2]);
+  doc.setLineWidth(0.2);
+  doc.roundedRect(x, y, w, 4.2, 0.8, 0.8, "S");
+  doc.setTextColor(color[0], color[1], color[2]);
+  doc.text(label.toUpperCase(), x + 2, y + 3);
+  return w;
+}
+
+/* ── gallery pages: 2-up, caption + chips ──────────────────── */
+async function drawGallery(doc: jsPDF, project: ProjectRow, images: ProjectImage[], theme: BrandTheme) {
+  const padH = 14, padV = 16, gap = 8, captionH = 9;
+  const slotH = (PAGE_H - padV * 2 - gap) / 2;
+  const imgH = slotH - captionH;
+  const boxW = PAGE_W - padH * 2;
+
+  for (let i = 0; i < images.length; i++) {
+    const slot = i % 2;
+    if (slot === 0) {
+      doc.addPage();
+      doc.setFillColor(255, 255, 255);
+      doc.rect(0, 0, PAGE_W, PAGE_H, "F");
+    }
+    const y = padV + slot * (slotH + gap);
+    const img = await coverImage(images[i].url);
+    doc.setFillColor(245, 245, 245);
+    doc.rect(padH, y, boxW, imgH, "F");
+    if (img) {
+      const f = fitCover(img.w, img.h, boxW, imgH);
+      doc.saveGraphicsState();
+      doc.rect(padH, y, boxW, imgH);
+      doc.clip();
+      doc.discardPath();
+      try {
+        doc.addImage(img.data, img.fmt, padH + f.x, y + f.y, f.w, f.h, undefined, "FAST");
+      } catch { /* ignore */ }
+      doc.restoreGraphicsState();
+    } else {
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(8);
+      doc.setTextColor(...MUTED);
+      doc.text("Image unavailable", padH + 5, y + 8);
+    }
+
+    // caption row
+    const cy = y + imgH + 5.5;
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(10);
+    doc.setTextColor(26, 26, 26);
+    doc.text(doc.splitTextToSize(project.project_name, boxW * 0.55)[0], padH, cy);
+
+    const chips: [string, RGB][] = [];
+    if (project.sector) chips.push([project.sector, theme.accent]);
+    if (project.product) chips.push([project.product, [26, 61, 204]]);
+    if (project.country) chips.push([project.country, [26, 122, 26]]);
+    for (const t of (images[i].tags ?? []).slice(0, 2)) chips.push([t, [102, 102, 102]]);
+    // right-align chips
+    doc.setFontSize(6);
+    const widths = chips.map((c) => doc.getTextWidth(c[0].toUpperCase()) + 4);
+    let cx = PAGE_W - padH - (widths.reduce((a, b) => a + b, 0) + 2 * Math.max(0, chips.length - 1));
+    for (let k = 0; k < chips.length; k++) {
+      cx += tagChip(doc, chips[k][0], chips[k][1], cx, cy - 3.2) + 2;
+    }
+  }
+}
+
+/* ── public API ────────────────────────────────────────────── */
 export async function buildProjectPdf(
   project: ProjectRow,
   images: ProjectImage[],
@@ -160,83 +409,31 @@ export async function buildProjectPdf(
 ): Promise<jsPDF> {
   const doc = existing ?? new jsPDF({ unit: "mm", format: "a4" });
   if (existing) doc.addPage();
-  const pageW = doc.internal.pageSize.getWidth();
-  const pageH = doc.internal.pageSize.getHeight();
-  const margin = 14;
+  const theme = themeFor(project.brand);
 
-  // ---- Cover / details page ----
-  const headerH = drawHeader(doc, project, pageW);
-  let y = headerH + 12;
+  let y = (await drawBanner(doc, project, theme, images[0]?.url)) + 16;
 
-  y = drawTags(doc, project.tags ?? [], margin, y, pageW - margin * 2);
-
-  const fields: [string, string][] = [
-    ["Project No", project.project_no],
-    ["Sector", project.sector ?? ""],
-    ["Country", project.country ?? ""],
-    ["Product", project.product ?? ""],
-    ["Finish", project.finish ?? ""],
-    ["Contractor", project.contractor ?? ""],
+  const rows: [string, string[]][] = [
+    ["Project", [project.project_name]],
+    ["Country", [project.country || "—"]],
+    ["Sector", [project.sector || "—"]],
+    ["Product", [project.product || "—"]],
+    ["Finish", [project.finish || "—"]],
+    ["Contractor", [project.contractor || "—"]],
   ];
-  y += 2;
-  for (const [k, v] of fields) y = drawDetailRow(doc, k, v, margin, y, pageW - margin * 2);
+  if (project.speciality) rows.push(["Speciality", [project.speciality]]);
+  if (project.accessories) rows.push(["Accessories", [project.accessories]]);
+  if (project.tags?.length) rows.push(["Tags", [project.tags.join("  ·  ")]]);
+  if (project.description) rows.push(["Description", [project.description]]);
 
-  if (project.description) {
-    y += 4;
-    y = drawDescription(doc, project.description, margin, y, pageW - margin * 2);
+  for (const [label, values] of rows) {
+    if (y > PAGE_H - 30) break;
+    y = drawRow(doc, theme, label, values, y);
   }
 
-  drawFooter(doc, `${project.project_name} · № ${project.project_no}`, pageW, pageH);
+  drawPageFooter(doc, theme);
 
-  // ---- Image pages: 2 per page (stacked) ----
-  if (images.length) {
-    const cellW = pageW - margin * 2;
-    const cellH = (pageH - margin * 2 - 18 - 8) / 2; // header + gap
-    let perPage = 0;
-    let cy = margin;
-    let firstOnPage = true;
-
-    for (let i = 0; i < images.length; i++) {
-      if (perPage === 0) {
-        doc.addPage();
-        cy = drawGalleryHeading(doc, margin, margin + 4) + 4;
-        firstOnPage = true;
-      }
-      const img = images[i];
-      const loaded = await urlToDataURL(img.url);
-      // Card background
-      doc.setFillColor(255, 255, 255);
-      doc.setDrawColor(226, 237, 220);
-      doc.roundedRect(margin, cy, cellW, cellH, 4, 4, "FD");
-      if (loaded) {
-        // Fit image inside card with 2mm padding
-        const padding = 2;
-        try {
-          doc.addImage(loaded.data, loaded.fmt, margin + padding, cy + padding, cellW - padding * 2, cellH - padding * 2 - 6, undefined, "FAST");
-        } catch {
-          doc.setFontSize(9); doc.setTextColor(...MUTED);
-          doc.text("Image unavailable", margin + 6, cy + 10);
-        }
-      } else {
-        doc.setFontSize(9); doc.setTextColor(...MUTED);
-        doc.text("Image unavailable", margin + 6, cy + 10);
-      }
-      // Caption
-      doc.setFont("helvetica", "normal");
-      doc.setFontSize(8);
-      doc.setTextColor(...MUTED);
-      doc.text(`Image ${i + 1} of ${images.length}`, margin + 4, cy + cellH - 2);
-
-      perPage++;
-      cy += cellH + 6;
-      if (perPage === 2) {
-        drawFooter(doc, `${project.project_name} · Images`, pageW, pageH);
-        perPage = 0;
-      }
-      firstOnPage = false;
-    }
-    if (perPage !== 0) drawFooter(doc, `${project.project_name} · Images`, pageW, pageH);
-  }
+  if (images.length) await drawGallery(doc, project, images, theme);
 
   return doc;
 }
