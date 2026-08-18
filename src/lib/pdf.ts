@@ -281,45 +281,60 @@ async function drawBanner(doc: jsPDF, project: ProjectRow, theme: BrandTheme, ba
   return tabY + tabH;
 }
 
-/* ── content rows: left accent label, rule, right values ───── */
-function drawRow(
+/* ── sleek data cells: hairline tiles in a 2-column grid ───── */
+function drawDataCell(
   doc: jsPDF,
   theme: BrandTheme,
   label: string,
-  values: string[],
+  value: string,
+  x: number,
   y: number,
+  w: number,
 ): number {
-  const labelX = MARGIN;
-  const labelW = 39;
-  const ruleX = labelX + labelW;
-  const textX = ruleX + 5;
-  const textW = PAGE_W - MARGIN - textX;
+  const padX = 5;
+  const textW = w - padX * 2;
+  const lines = doc.splitTextToSize(value || "—", textW).slice(0, 4);
+  const h = Math.max(17, 11 + lines.length * 4.6);
 
-  const lines: string[] = [];
-  for (const v of values) lines.push(...doc.splitTextToSize(v, textW));
-  const lineH = 5.3;
-  const blockH = Math.max(lines.length * lineH, 7);
-
+  // tile
+  doc.setFillColor(250, 250, 251);
+  doc.rect(x, y, w, h, "F");
+  doc.setDrawColor(228, 229, 232);
+  doc.setLineWidth(0.2);
+  doc.rect(x, y, w, h, "S");
+  // accent tick on the left edge
   doc.setFillColor(...theme.accent);
-  doc.rect(ruleX, y - 4, 0.6, blockH + 1, "F");
+  doc.rect(x, y, 0.9, h, "F");
 
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(11);
-  doc.setTextColor(...theme.accent);
-  const labelLines = doc.splitTextToSize(label.toUpperCase(), labelW - 6);
-  doc.text(labelLines, ruleX - 6, y + (blockH - labelLines.length * 4.6) / 2 - 0.5, {
-    align: "right",
-  });
+  doc.setFontSize(6);
+  doc.setTextColor(...MUTED);
+  doc.text(label.toUpperCase().split("").join(" "), x + padX, y + 5.6);
 
   doc.setFont("helvetica", "normal");
   doc.setFontSize(9.5);
   doc.setTextColor(...INK);
-  let ly = y;
+  let ly = y + 11;
   for (const ln of lines) {
-    doc.text(ln, textX, ly);
-    ly += lineH;
+    doc.text(ln, x + padX, ly);
+    ly += 4.6;
   }
-  return y + blockH + 9; // REGION_GAP
+  return h;
+}
+
+function drawSectionTitle(doc: jsPDF, theme: BrandTheme, title: string, y: number): number {
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(8);
+  doc.setTextColor(...INK);
+  doc.text(title.toUpperCase().split("").join(" "), MARGIN, y);
+  const tw = doc.getTextWidth(title.toUpperCase().split("").join(" "));
+  doc.setDrawColor(...theme.accent);
+  doc.setLineWidth(0.4);
+  doc.line(MARGIN, y + 2, MARGIN + tw, y + 2);
+  doc.setDrawColor(232, 232, 234);
+  doc.setLineWidth(0.2);
+  doc.line(MARGIN + tw + 3, y + 2, PAGE_W - MARGIN, y + 2);
+  return y + 8;
 }
 
 function drawPageFooter(doc: jsPDF, theme: BrandTheme) {
@@ -413,24 +428,73 @@ export async function buildProjectPdf(
   if (existing) doc.addPage();
   const theme = themeFor(project.brand);
 
-  let y = (await drawBanner(doc, project, theme, images[0]?.url)) + 16;
+  let y = (await drawBanner(doc, project, theme, images[0]?.url)) + 14;
 
-  const rows: [string, string[]][] = [
-    ["Project", [project.project_name]],
-    ["Country", [project.country || "—"]],
-    ["Sector", [project.sector || "—"]],
-    ["Product", [project.product || "—"]],
-    ["Finish", [project.finish || "—"]],
-    ["Contractor", [project.contractor || "—"]],
+  // project title block
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(20);
+  doc.setTextColor(...INK);
+  const titleLines = doc.splitTextToSize(project.project_name, PAGE_W - MARGIN * 2).slice(0, 2);
+  doc.text(titleLines, MARGIN, y);
+  y += titleLines.length * 8 + 1;
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(7.5);
+  doc.setTextColor(...MUTED);
+  doc.text(
+    [theme.name, project.country, project.sector].filter(Boolean).join("   /   ").toUpperCase(),
+    MARGIN,
+    y,
+  );
+  y += 9;
+
+  y = drawSectionTitle(doc, theme, "Project Data", y);
+
+  const cells: [string, string][] = [
+    ["Project No", `${project.project_no}`],
+    ["Country", project.country || "—"],
+    ["Sector", project.sector || "—"],
+    ["Product", project.product || "—"],
+    ["Finish", project.finish || "—"],
+    ["Contractor", project.contractor || "—"],
   ];
-  if (project.speciality) rows.push(["Speciality", [project.speciality]]);
-  if (project.accessories) rows.push(["Accessories", [project.accessories]]);
-  if (project.tags?.length) rows.push(["Tags", [project.tags.join("  ·  ")]]);
-  if (project.description) rows.push(["Description", [project.description]]);
+  if (project.speciality) cells.push(["Speciality", project.speciality]);
+  if (project.accessories) cells.push(["Accessories", project.accessories]);
 
-  for (const [label, values] of rows) {
-    if (y > PAGE_H - 30) break;
-    y = drawRow(doc, theme, label, values, y);
+  const gap = 5;
+  const colW = (PAGE_W - MARGIN * 2 - gap) / 2;
+  let rowMax = 0;
+  for (let i = 0; i < cells.length; i++) {
+    if (y > PAGE_H - 34) break;
+    const col = i % 2;
+    const h = drawDataCell(
+      doc, theme, cells[i][0], cells[i][1],
+      MARGIN + col * (colW + gap), y, colW,
+    );
+    rowMax = Math.max(rowMax, h);
+    if (col === 1 || i === cells.length - 1) {
+      y += rowMax + gap;
+      rowMax = 0;
+    }
+  }
+
+  if (project.tags?.length && y < PAGE_H - 40) {
+    y = drawSectionTitle(doc, theme, "Tags", y + 3);
+    let cx = MARGIN;
+    for (const t of project.tags) {
+      const w = doc.getTextWidth(t.toUpperCase()) + 4;
+      if (cx + w > PAGE_W - MARGIN) { cx = MARGIN; y += 6; }
+      cx += tagChip(doc, t, theme.accent, cx, y - 3) + 2;
+    }
+    y += 10;
+  }
+
+  if (project.description && y < PAGE_H - 34) {
+    y = drawSectionTitle(doc, theme, "Description", y);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9);
+    doc.setTextColor(...INK);
+    const dl = doc.splitTextToSize(project.description, PAGE_W - MARGIN * 2);
+    doc.text(dl.slice(0, 8), MARGIN, y + 1);
   }
 
   drawPageFooter(doc, theme);
