@@ -428,24 +428,73 @@ export async function buildProjectPdf(
   if (existing) doc.addPage();
   const theme = themeFor(project.brand);
 
-  let y = (await drawBanner(doc, project, theme, images[0]?.url)) + 16;
+  let y = (await drawBanner(doc, project, theme, images[0]?.url)) + 14;
 
-  const rows: [string, string[]][] = [
-    ["Project", [project.project_name]],
-    ["Country", [project.country || "—"]],
-    ["Sector", [project.sector || "—"]],
-    ["Product", [project.product || "—"]],
-    ["Finish", [project.finish || "—"]],
-    ["Contractor", [project.contractor || "—"]],
+  // project title block
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(20);
+  doc.setTextColor(...INK);
+  const titleLines = doc.splitTextToSize(project.project_name, PAGE_W - MARGIN * 2).slice(0, 2);
+  doc.text(titleLines, MARGIN, y);
+  y += titleLines.length * 8 + 1;
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(7.5);
+  doc.setTextColor(...MUTED);
+  doc.text(
+    [theme.name, project.country, project.sector].filter(Boolean).join("   /   ").toUpperCase(),
+    MARGIN,
+    y,
+  );
+  y += 9;
+
+  y = drawSectionTitle(doc, theme, "Project Data", y);
+
+  const cells: [string, string][] = [
+    ["Project No", `${project.project_no}`],
+    ["Country", project.country || "—"],
+    ["Sector", project.sector || "—"],
+    ["Product", project.product || "—"],
+    ["Finish", project.finish || "—"],
+    ["Contractor", project.contractor || "—"],
   ];
-  if (project.speciality) rows.push(["Speciality", [project.speciality]]);
-  if (project.accessories) rows.push(["Accessories", [project.accessories]]);
-  if (project.tags?.length) rows.push(["Tags", [project.tags.join("  ·  ")]]);
-  if (project.description) rows.push(["Description", [project.description]]);
+  if (project.speciality) cells.push(["Speciality", project.speciality]);
+  if (project.accessories) cells.push(["Accessories", project.accessories]);
 
-  for (const [label, values] of rows) {
-    if (y > PAGE_H - 30) break;
-    y = drawRow(doc, theme, label, values, y);
+  const gap = 5;
+  const colW = (PAGE_W - MARGIN * 2 - gap) / 2;
+  let rowMax = 0;
+  for (let i = 0; i < cells.length; i++) {
+    if (y > PAGE_H - 34) break;
+    const col = i % 2;
+    const h = drawDataCell(
+      doc, theme, cells[i][0], cells[i][1],
+      MARGIN + col * (colW + gap), y, colW,
+    );
+    rowMax = Math.max(rowMax, h);
+    if (col === 1 || i === cells.length - 1) {
+      y += rowMax + gap;
+      rowMax = 0;
+    }
+  }
+
+  if (project.tags?.length && y < PAGE_H - 40) {
+    y = drawSectionTitle(doc, theme, "Tags", y + 3);
+    let cx = MARGIN;
+    for (const t of project.tags) {
+      const w = doc.getTextWidth(t.toUpperCase()) + 4;
+      if (cx + w > PAGE_W - MARGIN) { cx = MARGIN; y += 6; }
+      cx += tagChip(doc, t, theme.accent, cx, y - 3) + 2;
+    }
+    y += 10;
+  }
+
+  if (project.description && y < PAGE_H - 34) {
+    y = drawSectionTitle(doc, theme, "Description", y);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9);
+    doc.setTextColor(...INK);
+    const dl = doc.splitTextToSize(project.description, PAGE_W - MARGIN * 2);
+    doc.text(dl.slice(0, 8), MARGIN, y + 1);
   }
 
   drawPageFooter(doc, theme);
