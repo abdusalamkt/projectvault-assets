@@ -281,45 +281,60 @@ async function drawBanner(doc: jsPDF, project: ProjectRow, theme: BrandTheme, ba
   return tabY + tabH;
 }
 
-/* ── content rows: left accent label, rule, right values ───── */
-function drawRow(
+/* ── sleek data cells: hairline tiles in a 2-column grid ───── */
+function drawDataCell(
   doc: jsPDF,
   theme: BrandTheme,
   label: string,
-  values: string[],
+  value: string,
+  x: number,
   y: number,
+  w: number,
 ): number {
-  const labelX = MARGIN;
-  const labelW = 39;
-  const ruleX = labelX + labelW;
-  const textX = ruleX + 5;
-  const textW = PAGE_W - MARGIN - textX;
+  const padX = 5;
+  const textW = w - padX * 2;
+  const lines = doc.splitTextToSize(value || "—", textW).slice(0, 4);
+  const h = Math.max(17, 11 + lines.length * 4.6);
 
-  const lines: string[] = [];
-  for (const v of values) lines.push(...doc.splitTextToSize(v, textW));
-  const lineH = 5.3;
-  const blockH = Math.max(lines.length * lineH, 7);
-
+  // tile
+  doc.setFillColor(250, 250, 251);
+  doc.rect(x, y, w, h, "F");
+  doc.setDrawColor(228, 229, 232);
+  doc.setLineWidth(0.2);
+  doc.rect(x, y, w, h, "S");
+  // accent tick on the left edge
   doc.setFillColor(...theme.accent);
-  doc.rect(ruleX, y - 4, 0.6, blockH + 1, "F");
+  doc.rect(x, y, 0.9, h, "F");
 
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(11);
-  doc.setTextColor(...theme.accent);
-  const labelLines = doc.splitTextToSize(label.toUpperCase(), labelW - 6);
-  doc.text(labelLines, ruleX - 6, y + (blockH - labelLines.length * 4.6) / 2 - 0.5, {
-    align: "right",
-  });
+  doc.setFontSize(6);
+  doc.setTextColor(...MUTED);
+  doc.text(label.toUpperCase().split("").join(" "), x + padX, y + 5.6);
 
   doc.setFont("helvetica", "normal");
   doc.setFontSize(9.5);
   doc.setTextColor(...INK);
-  let ly = y;
+  let ly = y + 11;
   for (const ln of lines) {
-    doc.text(ln, textX, ly);
-    ly += lineH;
+    doc.text(ln, x + padX, ly);
+    ly += 4.6;
   }
-  return y + blockH + 9; // REGION_GAP
+  return h;
+}
+
+function drawSectionTitle(doc: jsPDF, theme: BrandTheme, title: string, y: number): number {
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(8);
+  doc.setTextColor(...INK);
+  doc.text(title.toUpperCase().split("").join(" "), MARGIN, y);
+  const tw = doc.getTextWidth(title.toUpperCase().split("").join(" "));
+  doc.setDrawColor(...theme.accent);
+  doc.setLineWidth(0.4);
+  doc.line(MARGIN, y + 2, MARGIN + tw, y + 2);
+  doc.setDrawColor(232, 232, 234);
+  doc.setLineWidth(0.2);
+  doc.line(MARGIN + tw + 3, y + 2, PAGE_W - MARGIN, y + 2);
+  return y + 8;
 }
 
 function drawPageFooter(doc: jsPDF, theme: BrandTheme) {
