@@ -172,18 +172,6 @@ function angledBlock(
   doc.triangle(x + w - slant, y, x + w, y, x + w - slant, y + h, "F");
 }
 
-function fitCover(
-  imgW: number,
-  imgH: number,
-  boxW: number,
-  boxH: number,
-): { w: number; h: number; x: number; y: number } {
-  const scale = Math.max(boxW / imgW, boxH / imgH);
-  const w = imgW * scale;
-  const h = imgH * scale;
-  return { w, h, x: (boxW - w) / 2, y: (boxH - h) / 2 };
-}
-
 async function coverImage(url: string): Promise<{ data: string; fmt: "PNG" | "JPEG"; w: number; h: number } | null> {
   const loaded = await urlToDataURL(url);
   if (!loaded) return null;
