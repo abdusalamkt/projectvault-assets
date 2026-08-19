@@ -197,6 +197,49 @@ async function coverImage(url: string): Promise<{ data: string; fmt: "PNG" | "JP
   return { ...loaded, ...dims };
 }
 
+/**
+ * Crop an image to the box aspect ratio on a canvas (center-cover) so we never
+ * need PDF clipping paths — Acrobat chokes on jsPDF's clip/discardPath output
+ * (Chrome's viewer silently tolerates it), which blanks out all later text.
+ */
+async function croppedCover(
+  url: string,
+  boxW: number,
+  boxH: number,
+): Promise<{ data: string; fmt: "PNG" | "JPEG" } | null> {
+  const img = await coverImage(url);
+  if (!img) return null;
+  const targetRatio = boxW / boxH;
+  const srcRatio = img.w / img.h;
+  let sw = img.w, sh = img.h;
+  if (srcRatio > targetRatio) sw = img.h * targetRatio;
+  else sh = img.w / targetRatio;
+  const sx = (img.w - sw) / 2;
+  const sy = (img.h - sh) / 2;
+  const outW = Math.min(1600, Math.round(sw));
+  const outH = Math.round((outW * sh) / sw);
+  return new Promise((resolve) => {
+    const im = new Image();
+    im.onload = () => {
+      try {
+        const c = document.createElement("canvas");
+        c.width = outW;
+        c.height = outH;
+        const ctx = c.getContext("2d");
+        if (!ctx) return resolve(null);
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(0, 0, outW, outH);
+        ctx.drawImage(im, sx, sy, sw, sh, 0, 0, outW, outH);
+        resolve({ data: c.toDataURL("image/jpeg", 0.9), fmt: "JPEG" });
+      } catch {
+        resolve(null);
+      }
+    };
+    im.onerror = () => resolve(null);
+    im.src = img.data;
+  });
+}
+
 /* ── banner ────────────────────────────────────────────────── */
 async function drawBanner(doc: jsPDF, project: ProjectRow, theme: BrandTheme, bannerUrl?: string) {
   const barY = BANNER_H - BAR_H;
