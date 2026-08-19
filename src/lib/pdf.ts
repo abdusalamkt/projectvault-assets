@@ -413,19 +413,13 @@ async function drawGallery(doc: jsPDF, project: ProjectRow, images: ProjectImage
       doc.rect(0, 0, PAGE_W, PAGE_H, "F");
     }
     const y = padV + slot * (slotH + gap);
-    const img = await coverImage(images[i].url);
+    const img = await croppedCover(images[i].url, boxW, imgH);
     doc.setFillColor(245, 245, 245);
     doc.rect(padH, y, boxW, imgH, "F");
     if (img) {
-      const f = fitCover(img.w, img.h, boxW, imgH);
-      doc.saveGraphicsState();
-      doc.rect(padH, y, boxW, imgH);
-      doc.clip();
-      doc.discardPath();
       try {
-        doc.addImage(img.data, img.fmt, padH + f.x, y + f.y, f.w, f.h, undefined, "FAST");
+        doc.addImage(img.data, img.fmt, padH, y, boxW, imgH, undefined, "FAST");
       } catch { /* ignore */ }
-      doc.restoreGraphicsState();
     } else {
       doc.setFont("helvetica", "normal");
       doc.setFontSize(8);
