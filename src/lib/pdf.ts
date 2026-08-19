@@ -172,18 +172,6 @@ function angledBlock(
   doc.triangle(x + w - slant, y, x + w, y, x + w - slant, y + h, "F");
 }
 
-function fitCover(
-  imgW: number,
-  imgH: number,
-  boxW: number,
-  boxH: number,
-): { w: number; h: number; x: number; y: number } {
-  const scale = Math.max(boxW / imgW, boxH / imgH);
-  const w = imgW * scale;
-  const h = imgH * scale;
-  return { w, h, x: (boxW - w) / 2, y: (boxH - h) / 2 };
-}
-
 async function coverImage(url: string): Promise<{ data: string; fmt: "PNG" | "JPEG"; w: number; h: number } | null> {
   const loaded = await urlToDataURL(url);
   if (!loaded) return null;
@@ -197,6 +185,49 @@ async function coverImage(url: string): Promise<{ data: string; fmt: "PNG" | "JP
   return { ...loaded, ...dims };
 }
 
+/**
+ * Crop an image to the box aspect ratio on a canvas (center-cover) so we never
+ * need PDF clipping paths — Acrobat chokes on jsPDF's clip/discardPath output
+ * (Chrome's viewer silently tolerates it), which blanks out all later text.
+ */
+async function croppedCover(
+  url: string,
+  boxW: number,
+  boxH: number,
+): Promise<{ data: string; fmt: "PNG" | "JPEG" } | null> {
+  const img = await coverImage(url);
+  if (!img) return null;
+  const targetRatio = boxW / boxH;
+  const srcRatio = img.w / img.h;
+  let sw = img.w, sh = img.h;
+  if (srcRatio > targetRatio) sw = img.h * targetRatio;
+  else sh = img.w / targetRatio;
+  const sx = (img.w - sw) / 2;
+  const sy = (img.h - sh) / 2;
+  const outW = Math.min(1600, Math.round(sw));
+  const outH = Math.round((outW * sh) / sw);
+  return new Promise((resolve) => {
+    const im = new Image();
+    im.onload = () => {
+      try {
+        const c = document.createElement("canvas");
+        c.width = outW;
+        c.height = outH;
+        const ctx = c.getContext("2d");
+        if (!ctx) return resolve(null);
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(0, 0, outW, outH);
+        ctx.drawImage(im, sx, sy, sw, sh, 0, 0, outW, outH);
+        resolve({ data: c.toDataURL("image/jpeg", 0.9), fmt: "JPEG" });
+      } catch {
+        resolve(null);
+      }
+    };
+    im.onerror = () => resolve(null);
+    im.src = img.data;
+  });
+}
+
 /* ── banner ────────────────────────────────────────────────── */
 async function drawBanner(doc: jsPDF, project: ProjectRow, theme: BrandTheme, bannerUrl?: string) {
   const barY = BANNER_H - BAR_H;
@@ -204,17 +235,11 @@ async function drawBanner(doc: jsPDF, project: ProjectRow, theme: BrandTheme, ba
   doc.setFillColor(24, 24, 24);
   doc.rect(0, 0, PAGE_W, barY, "F");
   if (bannerUrl) {
-    const img = await coverImage(bannerUrl);
+    const img = await croppedCover(bannerUrl, PAGE_W, barY);
     if (img) {
-      const f = fitCover(img.w, img.h, PAGE_W, barY);
-      doc.saveGraphicsState();
-      doc.rect(0, 0, PAGE_W, barY);
-      doc.clip();
-      doc.discardPath();
       try {
-        doc.addImage(img.data, img.fmt, f.x, f.y, f.w, f.h, undefined, "FAST");
+        doc.addImage(img.data, img.fmt, 0, 0, PAGE_W, barY, undefined, "FAST");
       } catch { /* ignore */ }
-      doc.restoreGraphicsState();
     }
   }
   // thin hairline separating the image from the colour bar
@@ -376,19 +401,13 @@ async function drawGallery(doc: jsPDF, project: ProjectRow, images: ProjectImage
       doc.rect(0, 0, PAGE_W, PAGE_H, "F");
     }
     const y = padV + slot * (slotH + gap);
-    const img = await coverImage(images[i].url);
+    const img = await croppedCover(images[i].url, boxW, imgH);
     doc.setFillColor(245, 245, 245);
     doc.rect(padH, y, boxW, imgH, "F");
     if (img) {
-      const f = fitCover(img.w, img.h, boxW, imgH);
-      doc.saveGraphicsState();
-      doc.rect(padH, y, boxW, imgH);
-      doc.clip();
-      doc.discardPath();
       try {
-        doc.addImage(img.data, img.fmt, padH + f.x, y + f.y, f.w, f.h, undefined, "FAST");
+        doc.addImage(img.data, img.fmt, padH, y, boxW, imgH, undefined, "FAST");
       } catch { /* ignore */ }
-      doc.restoreGraphicsState();
     } else {
       doc.setFont("helvetica", "normal");
       doc.setFontSize(8);
