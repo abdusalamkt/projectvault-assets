@@ -247,17 +247,11 @@ async function drawBanner(doc: jsPDF, project: ProjectRow, theme: BrandTheme, ba
   doc.setFillColor(24, 24, 24);
   doc.rect(0, 0, PAGE_W, barY, "F");
   if (bannerUrl) {
-    const img = await coverImage(bannerUrl);
+    const img = await croppedCover(bannerUrl, PAGE_W, barY);
     if (img) {
-      const f = fitCover(img.w, img.h, PAGE_W, barY);
-      doc.saveGraphicsState();
-      doc.rect(0, 0, PAGE_W, barY);
-      doc.clip();
-      doc.discardPath();
       try {
-        doc.addImage(img.data, img.fmt, f.x, f.y, f.w, f.h, undefined, "FAST");
+        doc.addImage(img.data, img.fmt, 0, 0, PAGE_W, barY, undefined, "FAST");
       } catch { /* ignore */ }
-      doc.restoreGraphicsState();
     }
   }
   // thin hairline separating the image from the colour bar
